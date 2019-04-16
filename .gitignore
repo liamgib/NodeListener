@@ -1,3 +1,4 @@
 *.js
 *.jsx
-/node_modules
+node_modules
+/lib
