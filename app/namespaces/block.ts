@@ -1,6 +1,7 @@
 /**
  * The purpose of this class is to define a standard to interact with digital currency block data. 
  */
+import {Transaction} from './transaction';
  export class Block {
     private dataObject = {
         blockHeight: 0,
@@ -11,8 +12,13 @@
         blockMerkleRoot: "merkleRoot",
         blockTime: 0,
         blockNonce: 0,
-        blockChainwork: "chainwork"
+        blockChainwork: "chainwork",
+        totalSentBlock: 0,
+        totalRecievedBlock: 0,
+        totalFeeBlock: 0
     };
+
+    public Transactions: Array<Transaction> = [];
 
     constructor(height: number, hash: string, size: number, version: number, versionHex: string, merkleRoot: string, time: number, nonce: number,  chainwork: string){
         this.dataObject.blockHeight = height;
@@ -26,6 +32,17 @@
         this.dataObject.blockChainwork = chainwork;
     }
 
+
+    /** 
+     * Adds completed transaction instance to the block.
+     * @param transaction The relevant transaction instance.
+     */
+    public addTransaction(transaction:Transaction):void {
+        this.dataObject.totalRecievedBlock += transaction.getTotalRecieved();
+        this.dataObject.totalSentBlock += transaction.getTotalSent();
+        this.dataObject.totalFeeBlock += transaction.calculateFee();
+        this.Transactions.push(transaction);
+    }
 
     /*
      ------------- Get functions -------------
@@ -100,6 +117,7 @@
     public toJSON():string {
         return JSON.stringify(this.dataObject)
     }
+
 
 
 

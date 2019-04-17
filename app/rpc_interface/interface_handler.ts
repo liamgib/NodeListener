@@ -23,9 +23,11 @@ export class interface_handler{
     }
 
     public async getBlock(blockHeight: number):Promise<Block> {
+        var self = this;
         return new Promise<Block>((resolve, reject) => {
             // Retreive the block hash for the block Height.
             bitcoin_rpc.call('getblockhash', [blockHeight], function (err, res) {
+                
                 if (err !== null) {
                     reject();
                 } else {
@@ -36,7 +38,52 @@ export class interface_handler{
                             reject();
                         } else {
                             let newBlock = new Block(blockHeight, res.result.hash, res.result.size, res.result.version, res.result.versionHex, res.result.merkleroot, res.result.time, res.result.nonce, res.result.chainwork);
-                            resolve(newBlock);
+                            let icounter = 0;
+                            for (var i = 0, len = res.result.tx.length; i < len; i++) {
+                                //Lookup raw transaction
+                                bitcoin_rpc.call('getrawtransaction', [res.result.tx[i], 1], async function (err, res) {
+                                    if (err !== null) {
+                                        reject();
+                                    } else {
+                                        let newTransaction = new Transaction(res.result.txid, res.result.version, res.result.size);
+                                        //Loop through receievers
+                                        let itcounter = 0;
+                                        for(var it = 0, lent = res.result.vout.length; it < lent; it++){
+                                            if(res.result.vout[it].scriptPubKey.type !== 'nulldata'){
+                                                newTransaction.addReciever(res.result.vout[it].scriptPubKey.addresses[0], res.result.vout[it].value);
+                                                
+                                            }
+                                            //Last output
+                                            itcounter++;
+                                            if(itcounter == lent){
+                                                //Loop through senders
+                                                var lena = res.result.vin.length, i = 0;
+                                                for(i; i < lena; i++){
+                                                    if(res.result.vin[i].coinbase !== undefined){
+                                                        newTransaction.addSender('NEWCOINS', newTransaction.getTotalRecieved());
+                                                        if(i + 1 == lena){
+                                                            newBlock.addTransaction(newTransaction);
+                                                        }
+                                                    }else{
+                                                        await self.getSenderAddressANDAmount(res.result.vin[i].txid, res.result.vin[i].vout, i, lena).then(result => {
+                                                            newTransaction.addSender(result["address"], result["amount"]);
+                                                            if(result["index"] + 1 == result["max"]){
+                                                                newBlock.addTransaction(newTransaction);
+                                                                icounter++;
+                                                                if(icounter == len-1){
+                                                                    resolve(newBlock);
+                                                                }
+                                                            }
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                    }
+                                });
+                              }
+                            
                         }
                         
                     });
@@ -44,4 +91,21 @@ export class interface_handler{
             });
         });
     }
+
+    public async getSenderAddressANDAmount(txid:string, vout:number, i:number, max:number) {
+        var self = this;
+        return new Promise<Object>((resolve, reject) => {
+            bitcoin_rpc.call('getrawtransaction', [txid, 1], async function (err, resa) {
+                if(err !== null){
+                     setTimeout(function(){
+                        resolve(self.getSenderAddressANDAmount(txid, vout, i, max));
+                     }, 100);
+                }else{
+                    resolve({index: i, max: max, address: resa.result.vout[vout].scriptPubKey.addresses[0], amount: resa.result.vout[vout].value});
+                }
+            });
+        });
+    }
+
+
 }
