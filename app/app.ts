@@ -6,8 +6,10 @@ rpc.getBlockCount().then(blockCount => {
    // console.log(blockCount);
 })
 
-rpc.getBlock(235577).then(blockCount => {
-    console.log(blockCount,blockCount.Transactions.length);
+console.time('A');
+rpc.getBlock(235618).then(blockCount => {
+    console.timeEnd('A');
+    console.log(blockCount,blockCount.Transactions[1]);
 })
 
 var new_block = new Block(100, "ahdhf", 12, 1, "01f1", "dfdfdfmerkle", 1384583, 1, "datchainwork");

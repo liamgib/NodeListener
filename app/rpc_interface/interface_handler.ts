@@ -45,13 +45,14 @@ export class interface_handler{
                                     if (err !== null) {
                                         reject();
                                     } else {
+                                        
                                         let newTransaction = new Transaction(res.result.txid, res.result.version, res.result.size);
                                         //Loop through receievers
                                         let itcounter = 0;
                                         for(var it = 0, lent = res.result.vout.length; it < lent; it++){
+                                            
                                             if(res.result.vout[it].scriptPubKey.type !== 'nulldata'){
                                                 newTransaction.addReciever(res.result.vout[it].scriptPubKey.addresses[0], res.result.vout[it].value);
-                                                
                                             }
                                             //Last output
                                             itcounter++;
@@ -63,14 +64,18 @@ export class interface_handler{
                                                         newTransaction.addSender('NEWCOINS', newTransaction.getTotalRecieved());
                                                         if(i + 1 == lena){
                                                             newBlock.addTransaction(newTransaction);
+                                                            icounter++;
+                                                            if(icounter == len){
+                                                                resolve(newBlock);
+                                                            }
                                                         }
                                                     }else{
-                                                        await self.getSenderAddressANDAmount(res.result.vin[i].txid, res.result.vin[i].vout, i, lena).then(result => {
+                                                        self.getSenderAddressANDAmount(res.result.vin[i].txid, res.result.vin[i].vout, i, lena).then(result => {
                                                             newTransaction.addSender(result["address"], result["amount"]);
                                                             if(result["index"] + 1 == result["max"]){
                                                                 newBlock.addTransaction(newTransaction);
                                                                 icounter++;
-                                                                if(icounter == len-1){
+                                                                if(icounter == len){
                                                                     resolve(newBlock);
                                                                 }
                                                             }
