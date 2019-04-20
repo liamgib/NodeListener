@@ -112,6 +112,27 @@ import {Transaction} from './transaction';
     }
 
     /**
+     * Retrieve the total sent within the block.
+     */
+    public getTotalSent():number {
+        return this.dataObject.totalSentBlock;
+    }
+
+    /**
+     * Retrieve the total recieved within the block.
+     */
+    public getTotalRecieved():number {
+        return this.dataObject.totalRecievedBlock;
+    }
+
+    /**
+     * Retrieve the total fee within the block.
+     */
+    public getTotalFee():number {
+        return this.dataObject.totalFeeBlock;
+    }
+
+    /**
      * Converts the dataObject to a json string.
      */
     public toJSON():string {
