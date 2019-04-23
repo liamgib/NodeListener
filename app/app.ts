@@ -15,7 +15,7 @@ rpc.getBlock(235618).then(blockCount => {
     console.log(blockCount,blockCount.Transactions[1]);
 })*/
 
-var new_block = new Block(1001, "ahdhf", 12, 1, "01f1", "dfdfdfmerkle", 1384583, 1, "datchainwork");
+var new_block = new Block(10012, "ahdahf", 12, 1, "01f1", "dfdfdfmerkle", 1384583, 1, "datchainwork");
 //console.log("Aye", new_block.toJSON());
 
 var new_transaction = new Transaction("txid", 1, 100);

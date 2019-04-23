@@ -10,7 +10,7 @@ export class Transaction {
         totalRecieved: 0,
         totalFee: 0,
         senders: {},
-        recievers: {}
+        receivers: {}
     }
     
 
@@ -44,10 +44,10 @@ export class Transaction {
      */
     public addReciever(address:string, amount:number):void {
         this.dataObject.totalRecieved += amount;
-        if(this.dataObject.recievers[address] === undefined){
-            this.dataObject.recievers[address] = amount;
+        if(this.dataObject.receivers[address] === undefined){
+            this.dataObject.receivers[address] = amount;
         }else{
-            this.dataObject.recievers[address] += amount;
+            this.dataObject.receivers[address] += amount;
         }
     }
 
@@ -102,12 +102,18 @@ export class Transaction {
         return this.dataObject.totalRecieved;
     }
 
+    /**
+     * Returns senders dom object, contains address as key and amount as value.
+     */
     public getSenders():object {
         return this.dataObject.senders;
     }
 
-    public getRecievers():object {
-        return this.dataObject.recievers;
+    /**
+     * Returns receivers dom object, contains address as key and amount as value.
+     */
+    public getReceivers():object {
+        return this.dataObject.receivers;
     }
     
     /**

@@ -18,7 +18,7 @@ import {Transaction} from './transaction';
         totalFeeBlock: 0
     };
 
-    public Transactions: Array<Transaction> = [];
+    private Transactions: Array<Transaction> = [];
 
     constructor(height: number, hash: string, size: number, version: number, versionHex: string, merkleRoot: string, time: number, nonce: number,  chainwork: string){
         this.dataObject.blockHeight = height;
@@ -130,6 +130,13 @@ import {Transaction} from './transaction';
      */
     public getTotalFee():number {
         return this.dataObject.totalFeeBlock;
+    }
+
+    /**
+     * Retrieve all transactions within this block.
+     */
+    public getTransactions():Array<Transaction> {
+        return this.Transactions;
     }
 
     /**
