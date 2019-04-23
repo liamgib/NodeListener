@@ -3,67 +3,6 @@ import {Pool, PoolClient} from 'pg';
 import {Block} from '../namespaces/block';
 import {Transaction} from '../namespaces/transaction';
 
-
-/*
-
--- Table: public.blocks
-
--- DROP TABLE public.blocks;
-
-CREATE TABLE public.blocks
-(
-    height integer NOT NULL,
-    hash character varying(70) COLLATE pg_catalog."default" NOT NULL,
-    size smallint,
-    version smallint,
-    versionhex character varying(50) COLLATE pg_catalog."default",
-    merkleroot character varying(70) COLLATE pg_catalog."default",
-    "time" integer,
-    nonce integer,
-    chainwork character varying(70) COLLATE pg_catalog."default",
-    totalsent numeric(18,8),
-    totalrecieved numeric(18,8),
-    totalfee numeric(18,8),
-    totaltransactions smallint,
-    CONSTRAINT blocks_pkey PRIMARY KEY (height, hash)
-)
-WITH (
-    OIDS = FALSE
-)
-TABLESPACE pg_default;
-
-ALTER TABLE public.blocks
-    OWNER to postgres;
-
-    */
-
-/*
--- Table: public.transactions
-
--- DROP TABLE public.transactions;
-
-CREATE TABLE public.transactions
-(
-    transactionid character varying(70) COLLATE pg_catalog."default" NOT NULL,
-    version smallint,
-    size smallint,
-    totalsent numeric(18,8),
-    totalrecieved numeric(18,8),
-    totalfee numeric(18,8),
-    senders json,
-    receivers json,
-    CONSTRAINT transactions_pkey PRIMARY KEY (transactionid)
-)
-WITH (
-    OIDS = FALSE
-)
-TABLESPACE pg_default;
-
-ALTER TABLE public.transactions
-    OWNER to postgres;
-
-    */
-   
 export class database_handler{
     private pool: Pool;
     constructor(username:string, password:string, host:string, port:number, database:string){
