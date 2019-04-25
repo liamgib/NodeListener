@@ -24,15 +24,14 @@ export class interface_handler{
 
     public async getBlock(blockHeight: number):Promise<Block> {
         var self = this;
-        return new Promise<Block>((resolve, reject) => {
+        return new Promise<Block>(async (resolve, reject) => {
             // Retreive the block hash for the block Height.
-            bitcoin_rpc.call('getblockhash', [blockHeight], function (err, res) {
-                
+            await bitcoin_rpc.call('getblockhash', [blockHeight], async function (err, res) {
                 if (err !== null) {
                     reject();
                 } else {
                     //Retrieve the block data from the hash.
-                    bitcoin_rpc.call('getblock', [res.result, 1], function (err, res) {
+                    await bitcoin_rpc.call('getblock', [res.result, 1], async function (err, res) {
                         //Map to a block class instance.
                         if (err !== null) {
                             reject();
@@ -41,11 +40,10 @@ export class interface_handler{
                             let icounter = 0;
                             for (var i = 0, len = res.result.tx.length; i < len; i++) {
                                 //Lookup raw transaction
-                                bitcoin_rpc.call('getrawtransaction', [res.result.tx[i], 1], async function (err, res) {
+                                await bitcoin_rpc.call('getrawtransaction', [res.result.tx[i], 1], async function (err, res) {
                                     if (err !== null) {
                                         reject();
-                                    } else {
-                                        
+                                    } else {  
                                         let newTransaction = new Transaction(res.result.txid, res.result.version, res.result.size);
                                         //Loop through receievers
                                         let itcounter = 0;
@@ -70,7 +68,7 @@ export class interface_handler{
                                                             }
                                                         }
                                                     }else{
-                                                        self.getSenderAddressANDAmount(res.result.vin[i].txid, res.result.vin[i].vout, i, lena).then(result => {
+                                                        await self.getSenderAddressANDAmount(res.result.vin[i].txid, res.result.vin[i].vout, i, lena).then(result => {
                                                             newTransaction.addSender(result["address"], result["amount"]);
                                                             if(result["index"] + 1 == result["max"]){
                                                                 newBlock.addTransaction(newTransaction);
