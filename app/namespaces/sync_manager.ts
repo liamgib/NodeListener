@@ -28,6 +28,9 @@ export class sync_manager {
     }
 
     private loopSyncFunc(block_id:number) {
+        if(block_id == 0) {
+            block_id = 1;
+        }
         console.log("Creating new Block #" + block_id + ":");
         this.rpc_instance.getBlock(block_id).then(block => {
             console.log("  >> Loaded block #" + block_id);

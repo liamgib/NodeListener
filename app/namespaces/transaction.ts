@@ -105,14 +105,14 @@ export class Transaction {
     /**
      * Returns senders dom object, contains address as key and amount as value.
      */
-    public getSenders():object {
+    public getSenders():any {
         return this.dataObject.senders;
     }
 
     /**
      * Returns receivers dom object, contains address as key and amount as value.
      */
-    public getReceivers():object {
+    public getReceivers():any {
         return this.dataObject.receivers;
     }
     

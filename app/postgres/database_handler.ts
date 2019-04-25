@@ -2,6 +2,7 @@ declare function require(name:string);
 import {Pool, PoolClient} from 'pg';
 import {Block} from '../namespaces/block';
 import {Transaction} from '../namespaces/transaction';
+import { SSL_OP_SSLEAY_080_CLIENT_DH_BUG } from 'constants';
 
 export class database_handler{
     private pool: Pool;
@@ -67,7 +68,6 @@ export class database_handler{
                     console.log("Error inserting block.");
                 })
             } catch(e) {
-                console.log(e);
                 await client.query('ROLLBACK');
                 reject();
             } finally {
@@ -87,7 +87,6 @@ export class database_handler{
                     console.log("  >> Already created - skipped.")
                     resolve([true, true]);
                 }else{
-                    console.log(e);
                     if(e.error !== 'current transaction is aborted, commands ignored until end of transaction block') console.error(e, e.code, "A");
                     resolve([false, false]);
                 }
@@ -100,13 +99,49 @@ export class database_handler{
         return new Promise<object>(async (resolve, reject) => {
             try {
                 await poolClient.query('INSERT INTO transactions(transactionid, version, size, totalsent, totalrecieved, totalfee, senders, receivers) VALUES($1, $2, $3, $4, $5, $6, $7, $8)', [transaction.getTransactionID(), transaction.getVersion(), transaction.getSize(), transaction.getTotalSent(), transaction.getTotalRecieved(), transaction.calculateFee(), transaction.getSenders(), transaction.getReceivers()]);
+                for (var i = 0, len = Object.keys(transaction.getReceivers()).length; i < len; i++) {
+                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], true);
+                }
+                for (var i = 0, len = Object.keys(transaction.getSenders()).length; i < len; i++) {
+                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], true);
+                }
+                await this.insertAddressQuery(poolClient, 'FEES', transaction.calculateFee(), true);
                 resolve([true, transactionID]);
             } catch (e) {
-                console.log(e);
                 resolve([false, -1]);
             }
         });
     }
+
+    private insertAddressQuery(poolClient:PoolClient, address:string, balance:number, isConfirmed:boolean) {
+        const confirmedBalance = isConfirmed ? balance : 0;
+        const unconfirmedBalance = !isConfirmed? balance : 0;
+        const isSent = balance >= 0 ? false : true; 
+        const totalsent = isSent ? confirmedBalance : 0;
+        const totalreceived = !isSent ? confirmedBalance : 0;
+        return new Promise<object>(async (resolve, reject) => {
+            try {
+                await poolClient.query("SAVEPOINT prior_insert");
+                const res = await poolClient.query('INSERT INTO addresses(address, confirmed, unconfirmed, totalreceived, totalsent, created) VALUES($1, $2, $3, $4, $5, now())', [address, confirmedBalance, unconfirmedBalance, totalreceived, totalsent]);
+                resolve([true]);
+            } catch (e) {
+                await poolClient.query("ROLLBACK TO SAVEPOINT prior_insert");
+                if(e.routine == '_bt_check_unique'){
+                    //Aready exists update
+                    try {
+                    const resup = await poolClient.query("UPDATE addresses SET confirmed = confirmed + $2, unconfirmed = unconfirmed + $3, totalreceived = totalreceived + $4, totalsent = totalsent + $5 where address=$1", [address, confirmedBalance, unconfirmedBalance, totalreceived, totalsent]);
+                        resolve([true]);
+                    } catch (e) {
+                        resolve([false]);
+                    }
+                } else {
+                    console.log(e);
+                    resolve([false]);
+                }
+            }
+        });
+    }
+
 
     public getDatabaseHeight():Promise<number> {
         return new Promise<number>(async (resolve, reject) => {
