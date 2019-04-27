@@ -53,9 +53,7 @@ export class database_handler{
                                     resolve(true);
                                 }
                             });
-                            
                         }
-                        
                     }else{
                         await client.query('ROLLBACK');
                         if(isSkipped == true){
@@ -76,6 +74,11 @@ export class database_handler{
         });
     }
 
+    /**
+     * Function for executing the insert of a block in a SQL query.
+     * @param {PoolClient} poolClient The current pool client for correct transaction isolation.
+     * @param {Block} block The Block instance to insert.
+     */
     private insertBlockQuery(poolClient:PoolClient, block:Block):Promise<boolean[]> {
         return new Promise<boolean[]>(async (resolve, reject) => {
             try {
@@ -94,6 +97,12 @@ export class database_handler{
         });
     }
 
+    /**
+     * Used to execute the insert of the transaction within a SQL query. Will also execute address balance update while loaded.
+     * @param {PoolClient} poolClient The current pool client for correct transaction isolation.
+     * @param {Block} BlockInstance The Block with the transaction to insert.
+     * @param {number} transactionID The index of the transaction from the block.
+     */
     private insertTransactionQuery(poolClient:PoolClient, BlockInstance:Block, transactionID:number) {
         let transaction:Transaction = BlockInstance.getTransactions()[transactionID];
         return new Promise<object>(async (resolve, reject) => {
@@ -113,6 +122,15 @@ export class database_handler{
         });
     }
 
+    /**
+     * Used within insertTransactionQuery to insert or update a address balance with attempted to insert at the address,
+     * If it fails this means the address already exists therefore update the address balance.
+     * If the isConfirmed is true, the balance will update the 'unconfirmed' balance. 
+     * @param {PoolClient} poolClient The current pool client for correct transaction isolation.
+     * @param {String} address The address to update or insert.
+     * @param {Number} balance The balance to add or subtract from the address.
+     * @param {boolean} isConfirmed If the transaction update is confirmed ( > x amount of confirmations to prevent false transactions).
+     */
     private insertAddressQuery(poolClient:PoolClient, address:string, balance:number, isConfirmed:boolean) {
         const confirmedBalance = isConfirmed ? balance : 0;
         const unconfirmedBalance = !isConfirmed? balance : 0;
@@ -141,6 +159,9 @@ export class database_handler{
     }
 
 
+    /**
+     * Get the current blockheight from the database.
+     */
     public getDatabaseHeight():Promise<number> {
         return new Promise<number>(async (resolve, reject) => {
             try {
