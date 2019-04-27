@@ -2,7 +2,7 @@ declare function require(name:string);
 import {Pool, PoolClient} from 'pg';
 import {Block} from '../namespaces/block';
 import {Transaction} from '../namespaces/transaction';
-import { SSL_OP_SSLEAY_080_CLIENT_DH_BUG } from 'constants';
+
 
 export class database_handler{
     private pool: Pool;
@@ -122,20 +122,18 @@ export class database_handler{
         return new Promise<object>(async (resolve, reject) => {
             try {
                 await poolClient.query("SAVEPOINT prior_insert");
-                const res = await poolClient.query('INSERT INTO addresses(address, confirmed, unconfirmed, totalreceived, totalsent, created) VALUES($1, $2, $3, $4, $5, now())', [address, confirmedBalance, unconfirmedBalance, totalreceived, totalsent]);
+                await poolClient.query('INSERT INTO addresses(address, confirmed, unconfirmed, totalreceived, totalsent, created) VALUES($1, $2, $3, $4, $5, now())', [address, confirmedBalance, unconfirmedBalance, totalreceived, totalsent]);
                 resolve([true]);
             } catch (e) {
                 await poolClient.query("ROLLBACK TO SAVEPOINT prior_insert");
                 if(e.routine == '_bt_check_unique'){
-                    //Aready exists update
                     try {
-                    const resup = await poolClient.query("UPDATE addresses SET confirmed = confirmed + $2, unconfirmed = unconfirmed + $3, totalreceived = totalreceived + $4, totalsent = totalsent + $5 where address=$1", [address, confirmedBalance, unconfirmedBalance, totalreceived, totalsent]);
+                        await poolClient.query("UPDATE addresses SET confirmed = confirmed + $2, unconfirmed = unconfirmed + $3, totalreceived = totalreceived + $4, totalsent = totalsent + $5 where address=$1", [address, confirmedBalance, unconfirmedBalance, totalreceived, totalsent]);
                         resolve([true]);
                     } catch (e) {
                         resolve([false]);
                     }
                 } else {
-                    console.log(e);
                     resolve([false]);
                 }
             }
@@ -149,7 +147,6 @@ export class database_handler{
                 const res = await this.pool.query('SELECT height from blocks ORDER BY height desc limit 1;');
                 resolve(res.rows[0].height);
             } catch (e) {
-                console.log(e);
                 resolve(-1);
             }
         });
