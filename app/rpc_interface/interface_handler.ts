@@ -10,6 +10,11 @@ export class interface_handler{
         bitcoin_rpc.init('0.0.0.0', 18339, 'NOGdLCSui8', 'yOKFop6v7IjFwvr7uDVGbQ')
     }
 
+
+    /**
+     * Get block current block height from the digital currency RPC.
+     * @returns {Promise<Number>} The promise resolves the block height.
+     */
     public async getBlockCount():Promise<number> {
         return new Promise<number>(resolve => {
             bitcoin_rpc.call('getblockcount', [], function (err, res) {
@@ -22,6 +27,11 @@ export class interface_handler{
         });
     }
 
+    /**
+     * Retrieve block from digital currency RPC and assign to Block type DOM.
+     * @param {number} blockHeight The block height to load.
+     * @returns {Promise<Block>} The promise resolves with the Block instance.
+     */
     public async getBlock(blockHeight: number):Promise<Block> {
         var self = this;
         return new Promise<Block>(async (resolve, reject) => {
@@ -46,7 +56,6 @@ export class interface_handler{
                                         newTransaction.addSender('NEWCOINS', newTransaction.getTotalRecieved());
                                         if(i + 1 == lena) await newBlock.addTransaction(newTransaction);
                                         if(icounter == len) resolve(newBlock);
-                                        
                                     }else{
                                         await self.getSenderAddressANDAmount(res.result.vin[i].txid, res.result.vin[i].vout).then(async result => {
                                             newTransaction.addSender(result["address"], result["amount"]);
@@ -63,7 +72,12 @@ export class interface_handler{
         });
     }
 
-    public async getSenderAddressANDAmount(txid:string, vout:number) {
+    /**
+     * Private functions used within getBlock() to get the vin sender address and relevant amount.
+     * @param {String} txid The transaction ID the address is wihtin.
+     * @param {Number} vout The vout index of that transaction to select the address.
+     */
+    private async getSenderAddressANDAmount(txid:string, vout:number) {
         var self = this;
         return new Promise<Object>((resolve, reject) => {
             bitcoin_rpc.call('getrawtransaction', [txid, 1], async function (err, resa) {
