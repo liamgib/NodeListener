@@ -36,12 +36,13 @@ export class interface_handler{
         var self = this;
         return new Promise<Block>(async (resolve, reject) => {
             // Retreive the block hash for the block Height.
+            try {
             await bitcoin_rpc.call('getblockhash', [blockHeight], async function (err, res) {
-                if (err !== null) return reject();
+                if (err !== null || res.result === null) return reject();
                 //Retrieve the block data from the hash.
                 await bitcoin_rpc.call('getblock', [res.result, 1], async function (err, res) {
                     //Map to a block class instance.
-                    if (err !== null) return reject();
+                    if (err !== null || res.result === null) return reject();
                     let newBlock = new Block(blockHeight, res.result.hash, res.result.size, res.result.version, res.result.versionHex, res.result.merkleroot, res.result.time, res.result.nonce, res.result.chainwork);
                     for (var icounter = 0, len = res.result.tx.length; icounter < len; icounter++) {
                         //Lookup raw transaction
@@ -69,6 +70,9 @@ export class interface_handler{
                     } 
                 });
             });
+            } catch (e) {
+                return reject();
+            }
         });
     }
 

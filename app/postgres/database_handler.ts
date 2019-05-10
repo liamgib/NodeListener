@@ -31,6 +31,9 @@ export class database_handler{
      */
     public insertBlock(BlockInstance:Block):Promise<boolean> {
         return new Promise<boolean>(async (resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject('insertBlockTimeout');
+              }, 10000);
             const client = await this.pool.connect();
             try {
                 await client.query('BEGIN')
@@ -64,7 +67,7 @@ export class database_handler{
                     }
                 }).catch(() => {
                     console.log("Error inserting block.");
-                })
+                }) 
             } catch(e) {
                 await client.query('ROLLBACK');
                 reject();
@@ -73,6 +76,8 @@ export class database_handler{
             }
         });
     }
+
+
 
     /**
      * Function for executing the insert of a block in a SQL query.
@@ -172,5 +177,6 @@ export class database_handler{
             }
         });
     }
+
 
 }
