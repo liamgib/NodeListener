@@ -44,10 +44,11 @@ export class interface_handler{
                     //Map to a block class instance.
                     if (err !== null || res.result === null) return reject();
                     let newBlock = new Block(blockHeight, res.result.hash, res.result.size, res.result.version, res.result.versionHex, res.result.merkleroot, res.result.time, res.result.nonce, res.result.chainwork);
+                    let txCounter = 0;
                     for (var icounter = 0, len = res.result.tx.length; icounter < len; icounter++) {
                         //Lookup raw transaction
                         await bitcoin_rpc.call('getrawtransaction', [res.result.tx[icounter], 1], async function (err, res) {
-                            if (err !== null) return reject();  
+                            if (err !== null || res.result == null) return reject();  
                             let newTransaction = new Transaction(res.result.txid, res.result.version, res.result.size);
                             //Loop through receievers
                             for(var it = 0, lent = res.result.vout.length; it < lent; it++){
@@ -55,13 +56,19 @@ export class interface_handler{
                                 if(it == lent - 1) for(var i = 0, lena = res.result.vin.length; i < lena; i++){
                                     if(res.result.vin[i].coinbase !== undefined){
                                         newTransaction.addSender('NEWCOINS', newTransaction.getTotalRecieved());
-                                        if(i + 1 == lena) await newBlock.addTransaction(newTransaction);
-                                        if(icounter == len) resolve(newBlock);
+                                        if(i + 1 == lena){
+                                            await newBlock.addTransaction(newTransaction);
+                                            txCounter++;
+                                        }
+                                        if(txCounter == len) resolve(newBlock);
                                     }else{
                                         await self.getSenderAddressANDAmount(res.result.vin[i].txid, res.result.vin[i].vout).then(async result => {
                                             newTransaction.addSender(result["address"], result["amount"]);
-                                            if(i + 1 == lena) await newBlock.addTransaction(newTransaction);
-                                            if(icounter == len) resolve(newBlock);
+                                            if(i + 1 == lena){
+                                                await newBlock.addTransaction(newTransaction);
+                                                txCounter++;
+                                            }
+                                            if(txCounter == len) resolve(newBlock);
                                         });
                                     }
                                 }

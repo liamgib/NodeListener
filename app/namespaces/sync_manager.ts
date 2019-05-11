@@ -42,8 +42,8 @@ export class sync_manager {
         const diff:number = Math.abs(this.rpcHeight - block_id);
         const isConfirmed = (diff > this.TOTAL_CONFIRMATIONS) ? true : false;
         this.status = 'SYNCING';
-        console.log("Creating new Block #" + block_id + ":", block_id);
-        this.rpc_instance.getBlock(block_id).then(block => {
+        console.log("Creating new Block #" + block_id + ":", isConfirmed);
+        timeout(this.rpc_instance.getBlock(block_id).then(block => {
             console.log("  >> Loaded block #" + block_id);
             timeout(this.database.insertBlock(block).then(ifOkay => {
                 console.log("  >> Created Block #" + block_id);
@@ -53,7 +53,9 @@ export class sync_manager {
                 console.log("Error creating block #" + block_id);
             }), 10000).catch((err) => {
                 if (err instanceof TimeoutError) {
-                  console.error('Timeout :-(');
+                  //Timed out, retry.
+                  console.error('Timed out on Block ID:', block_id);
+                  this.loopSyncFunc(block_id);
                 }
             });
             
@@ -76,6 +78,12 @@ export class sync_manager {
                 console.error("Attempting retry: ", block_id);
                 this.isRetry = true;
                 this.loopSyncFunc(block_id);
+            }
+        })).catch((err) => {
+            if (err instanceof TimeoutError) {
+              //Timed out, retry.
+              console.error('Timed out on Block ID:', block_id);
+              this.loopSyncFunc(block_id);
             }
         });
     }
