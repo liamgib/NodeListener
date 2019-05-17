@@ -2,11 +2,16 @@ declare function require(name:string);
 import {Pool, PoolClient} from 'pg';
 import {Block} from '../namespaces/block';
 import {Transaction} from '../namespaces/transaction';
-
+import {confirmed_deposit, unconfirmed_deposit, confirmed_withdraw, unconfirmed_withdraw} from '../events';
 
 export class database_handler{
     private pool: Pool;
-    constructor(username:string, password:string, host:string, port:number, database:string){
+    private confirmed_deposit_event:confirmed_deposit;
+    private unconfirmed_deposit_event:unconfirmed_deposit;
+    private confirmed_withdraw_event:confirmed_withdraw;
+    private unconfirmed_withdraw_event:unconfirmed_withdraw;
+
+    constructor(username:string, password:string, host:string, port:number, database:string, confirmed_deposit_event: confirmed_deposit, unconfirmed_deposit_event: unconfirmed_deposit, confirmed_withdraw_event: confirmed_withdraw, unconfirmed_withdraw_event: unconfirmed_withdraw){
         this.pool = new Pool({
             user: username,
             host: host,
@@ -21,7 +26,11 @@ export class database_handler{
             }else{
                 console.log("Started Database. Server time is " + res.rows[0].now);
             }
-        });  
+        });
+        this.confirmed_deposit_event = confirmed_deposit_event;
+        this.unconfirmed_deposit_event = unconfirmed_deposit_event;
+        this.confirmed_withdraw_event = confirmed_withdraw_event;
+        this.unconfirmed_withdraw_event = unconfirmed_withdraw_event;  
     }
 
     /**
@@ -87,8 +96,8 @@ export class database_handler{
     private insertBlockQuery(poolClient:PoolClient, block:Block):Promise<boolean[]> {
         return new Promise<boolean[]>(async (resolve, reject) => {
             try {
-                await poolClient.query('INSERT INTO blocks(height, hash, size, version, versionhex, merkleroot, time, nonce, chainwork, totalSent, totalrecieved, totalfee, totaltransactions) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)',
-                [block.getBlockHeight(), block.getBlockHash(), block.getBlockSize(), block.getBlockVersion(), block.getBlockVersionHex(), block.getBlockMerkleRoot(), block.getBlockTime(), block.getBlockNonce(), block.getBlockChainwork(), block.getTotalSent(), block.getTotalRecieved(), block.getTotalFee(), block.getTransactions().length]);
+                await poolClient.query('INSERT INTO blocks(height, hash, size, version, versionhex, merkleroot, time, nonce, chainwork, totalSent, totalrecieved, totalfee, totaltransactions, diff, bits) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)',
+                [block.getBlockHeight(), block.getBlockHash(), block.getBlockSize(), block.getBlockVersion(), block.getBlockVersionHex(), block.getBlockMerkleRoot(), block.getBlockTime(), block.getBlockNonce(), block.getBlockChainwork(), block.getTotalSent(), block.getTotalRecieved(), block.getTotalFee(), block.getTransactions().length, block.getBlockDifficulty(), block.getBlockBits()]);
                 resolve([true, false]);
             } catch (e) {
                 if(e.code == '23505'){
@@ -112,7 +121,7 @@ export class database_handler{
         let transaction:Transaction = BlockInstance.getTransactions()[transactionID];
         return new Promise<object>(async (resolve, reject) => {
             try {
-                await poolClient.query('INSERT INTO transactions(transactionid, version, size, totalsent, totalrecieved, totalfee, senders, receivers) VALUES($1, $2, $3, $4, $5, $6, $7, $8)', [transaction.getTransactionID(), transaction.getVersion(), transaction.getSize(), transaction.getTotalSent(), transaction.getTotalRecieved(), transaction.calculateFee(), transaction.getSenders(), transaction.getReceivers()]);
+                await poolClient.query('INSERT INTO transactions(transactionid, version, size, totalsent, totalrecieved, totalfee, senders, receivers, time) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)', [transaction.getTransactionID(), transaction.getVersion(), transaction.getSize(), transaction.getTotalSent(), transaction.getTotalRecieved(), transaction.calculateFee(), transaction.getSenders(), transaction.getReceivers(), transaction.getTime()]);
                 for (var i = 0, len = Object.keys(transaction.getReceivers()).length; i < len; i++) {
                     await this.insertAddressQuery(poolClient, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], true);
                 }
@@ -151,7 +160,16 @@ export class database_handler{
                 await poolClient.query("ROLLBACK TO SAVEPOINT prior_insert");
                 if(e.routine == '_bt_check_unique'){
                     try {
-                        await poolClient.query("UPDATE addresses SET confirmed = confirmed + $2, unconfirmed = unconfirmed + $3, totalreceived = totalreceived + $4, totalsent = totalsent + $5 where address=$1", [address, confirmedBalance, unconfirmedBalance, totalreceived, totalsent]);
+                        const res = await poolClient.query("UPDATE addresses SET confirmed = confirmed + $2, unconfirmed = unconfirmed + $3, totalreceived = totalreceived + $4, totalsent = totalsent + $5 where address=$1 RETURNING events", [address, confirmedBalance, unconfirmedBalance, totalreceived, totalsent]);
+                        if(res.rows[0].events){
+                            if(isSent){
+                                if(isConfirmed) this.confirmed_withdraw_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
+                                if(!isConfirmed) this.unconfirmed_withdraw_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
+                            }else{
+                                if(isConfirmed) this.confirmed_deposit_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
+                                if(!isConfirmed) this.unconfirmed_deposit_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
+                            }
+                        }
                         resolve([true]);
                     } catch (e) {
                         resolve([false]);
@@ -180,3 +198,4 @@ export class database_handler{
 
 
 }
+

@@ -43,7 +43,7 @@ export class interface_handler{
                 await bitcoin_rpc.call('getblock', [res.result, 1], async function (err, res) {
                     //Map to a block class instance.
                     if (err !== null || res.result === null) return reject();
-                    let newBlock = new Block(blockHeight, res.result.hash, res.result.size, res.result.version, res.result.versionHex, res.result.merkleroot, res.result.time, res.result.nonce, res.result.chainwork);
+                    let newBlock = new Block(blockHeight, res.result.hash, res.result.size, res.result.version, res.result.versionHex, res.result.merkleroot, res.result.time, res.result.nonce, res.result.chainwork, res.result.bits, res.result.difficulty);
                     let txCounter = 0;
                     for (var icounter = 0, len = res.result.tx.length; icounter < len; icounter++) {
                         //Lookup raw transaction

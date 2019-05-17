@@ -12,6 +12,8 @@ import {Transaction} from './transaction';
         blockMerkleRoot: "merkleRoot",
         blockTime: 0,
         blockNonce: 0,
+        blockDiff: "blockdiff",
+        blockBits: "bits",
         blockChainwork: "chainwork",
         totalSentBlock: 0,
         totalRecievedBlock: 0,
@@ -20,7 +22,7 @@ import {Transaction} from './transaction';
 
     private Transactions: Array<Transaction> = [];
 
-    constructor(height: number, hash: string, size: number, version: number, versionHex: string, merkleRoot: string, time: number, nonce: number,  chainwork: string){
+    constructor(height: number, hash: string, size: number, version: number, versionHex: string, merkleRoot: string, time: number, nonce: number, chainwork: string, bits: string, diff: string){
         this.dataObject.blockHeight = height;
         this.dataObject.blockHash = hash;
         this.dataObject.blockSize = size;
@@ -30,6 +32,8 @@ import {Transaction} from './transaction';
         this.dataObject.blockTime = time;
         this.dataObject.blockNonce = nonce;
         this.dataObject.blockChainwork = chainwork;
+        this.dataObject.blockBits = bits;
+        this.dataObject.blockDiff = diff;
     }
 
 
@@ -109,6 +113,20 @@ import {Transaction} from './transaction';
      */
     public getBlockChainwork():string {
         return this.dataObject.blockChainwork;
+    }
+
+    /**
+     *  The difficulty of the block at the time mined.
+     */
+    public getBlockDifficulty():string {
+        return this.dataObject.blockDiff;
+    }
+
+    /**
+     *  The 'Bits' of the block, used for mining.
+     */
+    public getBlockBits():string {
+        return this.dataObject.blockBits;
     }
 
     /**

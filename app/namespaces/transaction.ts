@@ -9,16 +9,18 @@ export class Transaction {
         totalSent: 0,
         totalRecieved: 0,
         totalFee: 0,
+        time: 0,
         senders: {},
         receivers: {}
     }
     
 
 
-    constructor(txid: string, version: number, size: number){
+    constructor(txid: string, version: number, size: number, time: number){
         this.dataObject.transactionID = txid;
         this.dataObject.version = version;
         this.dataObject.size = size;
+        this.dataObject.time = time;
     }
 
 
@@ -88,6 +90,13 @@ export class Transaction {
         return this.dataObject.size;
     }
 
+    /**
+     * Returns the time of the transaction.
+     */
+    public getTime():number {
+        return this.dataObject.time;
+    }
+    
     /**
      * Returns the total amount sent in this transaction.
      */
