@@ -38,7 +38,7 @@ export class database_handler{
      * Submit socket update notifications to transaction instance if a relevant address is updated.
      * @param BlockInstance The block instance containing all relevant data.
      */
-    public insertBlock(BlockInstance:Block):Promise<boolean> {
+    public insertBlock(BlockInstance:Block, isConfirmed: boolean):Promise<boolean> {
         return new Promise<boolean>(async (resolve, reject) => {
             const timeout = setTimeout(() => {
                 reject('insertBlockTimeout');
@@ -46,13 +46,13 @@ export class database_handler{
             const client = await this.pool.connect();
             try {
                 await client.query('BEGIN')
-                await this.insertBlockQuery(client, BlockInstance).then(async result => {
+                await this.insertBlockQuery(client, BlockInstance, isConfirmed).then(async result => {
                     let isCreated = result[0];
                     let isSkipped = result[1];
                     if(isCreated == true && isSkipped == false){
                         //Look through transactions and insert into database.
                         for (var i = 0, len = BlockInstance.getTransactions().length; i < len; i++) {
-                            await this.insertTransactionQuery(client, BlockInstance, i).then(async result => {
+                            await this.insertTransactionQuery(client, BlockInstance, i, isConfirmed).then(async result => {
                                 let transactionID = result[1];
                                 let isTXCreated = result[0];
                                 if(!isTXCreated){
@@ -93,11 +93,11 @@ export class database_handler{
      * @param {PoolClient} poolClient The current pool client for correct transaction isolation.
      * @param {Block} block The Block instance to insert.
      */
-    private insertBlockQuery(poolClient:PoolClient, block:Block):Promise<boolean[]> {
+    private insertBlockQuery(poolClient:PoolClient, block:Block, isConfirmed: boolean):Promise<boolean[]> {
         return new Promise<boolean[]>(async (resolve, reject) => {
             try {
-                await poolClient.query('INSERT INTO blocks(height, hash, size, version, versionhex, merkleroot, time, nonce, chainwork, totalSent, totalrecieved, totalfee, totaltransactions, diff, bits) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)',
-                [block.getBlockHeight(), block.getBlockHash(), block.getBlockSize(), block.getBlockVersion(), block.getBlockVersionHex(), block.getBlockMerkleRoot(), block.getBlockTime(), block.getBlockNonce(), block.getBlockChainwork(), block.getTotalSent(), block.getTotalRecieved(), block.getTotalFee(), block.getTransactions().length, block.getBlockDifficulty(), block.getBlockBits()]);
+                await poolClient.query('INSERT INTO blocks(height, hash, size, version, versionhex, merkleroot, time, nonce, chainwork, totalSent, totalrecieved, totalfee, totaltransactions, diff, bits, confirmed, transactions) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)',
+                [block.getBlockHeight(), block.getBlockHash(), block.getBlockSize(), block.getBlockVersion(), block.getBlockVersionHex(), block.getBlockMerkleRoot(), block.getBlockTime(), block.getBlockNonce(), block.getBlockChainwork(), block.getTotalSent(), block.getTotalRecieved(), block.getTotalFee(), block.getTransactions().length, block.getBlockDifficulty(), block.getBlockBits(), isConfirmed, block.getTransactionsJSON()]);
                 resolve([true, false]);
             } catch (e) {
                 if(e.code == '23505'){
@@ -117,18 +117,19 @@ export class database_handler{
      * @param {Block} BlockInstance The Block with the transaction to insert.
      * @param {number} transactionID The index of the transaction from the block.
      */
-    private insertTransactionQuery(poolClient:PoolClient, BlockInstance:Block, transactionID:number) {
+    private insertTransactionQuery(poolClient:PoolClient, BlockInstance:Block, transactionID:number, isConfirmed: boolean) {
         let transaction:Transaction = BlockInstance.getTransactions()[transactionID];
         return new Promise<object>(async (resolve, reject) => {
             try {
-                await poolClient.query('INSERT INTO transactions(transactionid, version, size, totalsent, totalrecieved, totalfee, senders, receivers, time) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)', [transaction.getTransactionID(), transaction.getVersion(), transaction.getSize(), transaction.getTotalSent(), transaction.getTotalRecieved(), transaction.calculateFee(), transaction.getSenders(), transaction.getReceivers(), transaction.getTime()]);
+                await poolClient.query('INSERT INTO transactions(transactionid, version, size, totalsent, totalrecieved, totalfee, senders, receivers, time, confirmed, height) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)', [transaction.getTransactionID(), transaction.getVersion(), transaction.getSize(), transaction.getTotalSent(), transaction.getTotalRecieved(), transaction.calculateFee(), transaction.getSenders(), transaction.getReceivers(), transaction.getTime(), isConfirmed, transaction.getHeight()]);
                 for (var i = 0, len = Object.keys(transaction.getReceivers()).length; i < len; i++) {
-                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], true);
+                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], isConfirmed);
                 }
                 for (var i = 0, len = Object.keys(transaction.getSenders()).length; i < len; i++) {
-                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], true);
+                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], isConfirmed);
                 }
-                await this.insertAddressQuery(poolClient, 'FEES', transaction.calculateFee(), true);
+                const FEES = await transaction.calculateFee();
+                if(FEES !== 0) await this.insertAddressQuery(poolClient, 'FEES', FEES, isConfirmed);
                 resolve([true, transactionID]);
             } catch (e) {
                 resolve([false, -1]);
@@ -179,6 +180,31 @@ export class database_handler{
                 }
             }
         });
+    }
+
+    /**
+     * Used within interface_handler to confirm a series of transactions from a block. 
+     * @param {Transaction} transaction The transaction to confirm.
+     */
+    public confirmTransaction(transaction: Transaction) {
+
+    }
+
+
+    /**
+     * Used within interface_handler to reject a series of transactions from a block.
+     * @param {Transaction} transaction The transaction to reject.
+     */
+    public rejectTransaction(transaction: Transaction){
+
+    }
+    
+    /**
+     * Used to get a list of transaction of a block from the database.
+     * @param {Number} blockHeight The height of the block.
+     */
+    public async getTransactions(blockHeight: number){
+
     }
 
 

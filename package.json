@@ -1,6 +1,6 @@
 {
   "name": "nodelistener",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "An interface to the relevant digital currencies for parsing new blocks containing transactions into a PostgreSQL database for reliable and immeditate data lookup. Along with reporting of important addressess to the AUCRYPTO_TRANSACTION Central server cluster.",
   "main": "index.js",
   "scripts": {

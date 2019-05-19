@@ -10,17 +10,19 @@ export class Transaction {
         totalRecieved: 0,
         totalFee: 0,
         time: 0,
+        height: -1,
         senders: {},
         receivers: {}
     }
     
 
 
-    constructor(txid: string, version: number, size: number, time: number){
+    constructor(txid: string, version: number, size: number, time: number, height: number){
         this.dataObject.transactionID = txid;
         this.dataObject.version = version;
         this.dataObject.size = size;
         this.dataObject.time = time;
+        this.dataObject.height = height;
     }
 
 
@@ -123,6 +125,15 @@ export class Transaction {
      */
     public getReceivers():any {
         return this.dataObject.receivers;
+    }
+
+
+    /**
+     * Returns the block height of the transaction.
+     * Will return -1 if in mempool.
+     */
+    public getHeight():number {
+        return this.dataObject.height;
     }
     
     /**

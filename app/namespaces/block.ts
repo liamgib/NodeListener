@@ -15,6 +15,7 @@ import {Transaction} from './transaction';
         blockDiff: "blockdiff",
         blockBits: "bits",
         blockChainwork: "chainwork",
+        blockConfirmations: 0,
         totalSentBlock: 0,
         totalRecievedBlock: 0,
         totalFeeBlock: 0
@@ -22,7 +23,7 @@ import {Transaction} from './transaction';
 
     private Transactions: Array<Transaction> = [];
 
-    constructor(height: number, hash: string, size: number, version: number, versionHex: string, merkleRoot: string, time: number, nonce: number, chainwork: string, bits: string, diff: string){
+    constructor(height: number, hash: string, size: number, version: number, versionHex: string, merkleRoot: string, time: number, nonce: number, chainwork: string, bits: string, diff: string, confirmations: number){
         this.dataObject.blockHeight = height;
         this.dataObject.blockHash = hash;
         this.dataObject.blockSize = size;
@@ -34,6 +35,7 @@ import {Transaction} from './transaction';
         this.dataObject.blockChainwork = chainwork;
         this.dataObject.blockBits = bits;
         this.dataObject.blockDiff = diff;
+        this.dataObject.blockConfirmations = confirmations;
     }
 
 
@@ -130,6 +132,14 @@ import {Transaction} from './transaction';
     }
 
     /**
+     * The confirmations of the block, should just be the x amount of blocks since this block height.
+     * Just good to double check on confirmation.
+     */
+    public getBlockConfirmations():number {
+        return this.dataObject.blockConfirmations;
+    }
+
+    /**
      * Retrieve the total sent within the block.
      */
     public getTotalSent():number {
@@ -162,6 +172,16 @@ import {Transaction} from './transaction';
      */
     public toJSON():string {
         return JSON.stringify(this.dataObject)
+    }
+
+    public getTransactionsJSON():string {
+        let transactions: Array<string> = [];
+        for(let i = 0, len = this.Transactions.length; i < len; i++){
+            transactions.push(this.Transactions[i].getTransactionID());
+            if(i == len - 1){
+                return JSON.stringify(transactions);
+            }
+        }
     }
 
 

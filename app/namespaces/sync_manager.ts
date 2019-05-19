@@ -76,16 +76,16 @@ export class sync_manager {
     private async loopSyncFunc(block_id:number) {
         this.rpcHeight = await this.rpc_instance.getBlockCount();
         const diff:number = Math.abs(this.rpcHeight - block_id);
-        const isConfirmed = (diff > this.TOTAL_CONFIRMATIONS) ? true : false;
+        const isConfirmed = (diff >= this.TOTAL_CONFIRMATIONS) ? true : false;
         this.status = 'SYNCING';
         this.rpc_instance.getBlock(block_id).then(block => {
             console.log("Creating new Block #" + block_id + ":", isConfirmed);
             console.log("  >> Loaded block #" + block_id);
-            timeout(this.database.insertBlock(block).then(ifOkay => {
+            timeout(this.database.insertBlock(block, isConfirmed).then(ifOkay => {
                 console.log("  >> Created Block #" + block_id);
                 block_id++;
                 this.loopSyncFunc(block_id);
-            }).catch(() => {
+            }).catch((e) => {
                 console.log("Error creating block #" + block_id);
             }), 10000).catch((err) => {
                 if (err instanceof TimeoutError) {

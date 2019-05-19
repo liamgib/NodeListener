@@ -43,13 +43,13 @@ export class interface_handler{
                 await bitcoin_rpc.call('getblock', [res.result, 1], async function (err, res) {
                     //Map to a block class instance.
                     if (err !== null || res.result === null) return reject();
-                    let newBlock = new Block(blockHeight, res.result.hash, res.result.size, res.result.version, res.result.versionHex, res.result.merkleroot, res.result.time, res.result.nonce, res.result.chainwork, res.result.bits, res.result.difficulty);
+                    let newBlock = new Block(blockHeight, res.result.hash, res.result.size, res.result.version, res.result.versionHex, res.result.merkleroot, res.result.time, res.result.nonce, res.result.chainwork, res.result.bits, res.result.difficulty, res.result.confirmations);
                     let txCounter = 0;
                     for (var icounter = 0, len = res.result.tx.length; icounter < len; icounter++) {
                         //Lookup raw transaction
                         await bitcoin_rpc.call('getrawtransaction', [res.result.tx[icounter], 1], async function (err, res) {
                             if (err !== null || res.result == null) return reject();  
-                            let newTransaction = new Transaction(res.result.txid, res.result.version, res.result.size);
+                            let newTransaction = new Transaction(res.result.txid, res.result.version, res.result.size, res.result.time, blockHeight);
                             //Loop through receievers
                             for(var it = 0, lent = res.result.vout.length; it < lent; it++){
                                 if(res.result.vout[it].scriptPubKey.type !== 'nulldata') newTransaction.addReciever(res.result.vout[it].scriptPubKey.addresses[0], res.result.vout[it].value);
@@ -101,6 +101,19 @@ export class interface_handler{
                 }
             });
         });
+    }
+
+
+    public async confirmBlock(blockid: number, requiredConfirmations: number): Promise<boolean>{
+        await this.getBlock(blockid).then(block_i => {
+            if(block_i.getBlockConfirmations() < requiredConfirmations) return false;
+            
+        }); 
+        return true;
+    }
+
+    public async confirmBlocks(requiredConfirmations: number) {
+
     }
 
 
