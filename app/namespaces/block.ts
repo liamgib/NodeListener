@@ -12,7 +12,7 @@ import {Transaction} from './transaction';
         blockMerkleRoot: "merkleRoot",
         blockTime: 0,
         blockNonce: 0,
-        blockDiff: "blockdiff",
+        blockDiff: 0.00,
         blockBits: "bits",
         blockChainwork: "chainwork",
         blockConfirmations: 0,
@@ -23,7 +23,7 @@ import {Transaction} from './transaction';
 
     private Transactions: Array<Transaction> = [];
 
-    constructor(height: number, hash: string, size: number, version: number, versionHex: string, merkleRoot: string, time: number, nonce: number, chainwork: string, bits: string, diff: string, confirmations: number){
+    constructor(height: number, hash: string, size: number, version: number, versionHex: string, merkleRoot: string, time: number, nonce: number, chainwork: string, bits: string, diff: number, confirmations: number){
         this.dataObject.blockHeight = height;
         this.dataObject.blockHash = hash;
         this.dataObject.blockSize = size;
@@ -120,7 +120,7 @@ import {Transaction} from './transaction';
     /**
      *  The difficulty of the block at the time mined.
      */
-    public getBlockDifficulty():string {
+    public getBlockDifficulty():Number {
         return this.dataObject.blockDiff;
     }
 
@@ -166,6 +166,27 @@ import {Transaction} from './transaction';
     public getTransactions():Array<Transaction> {
         return this.Transactions;
     }
+
+
+
+    /**
+     * Used to compare all block relevant information.
+     * Will not check totalBalances or transaction data.
+     * @param otherBlock Block to compare with
+     * @returns The reason for the failure, otherwise 'CLEAN'
+     */
+    public compareBlock(otherBlock: Block):String {
+        if(this.getBlockHeight() !== otherBlock.getBlockHeight()) return 'MISMATCH_HEIGHT';
+        if(this.getBlockHash() !== otherBlock.getBlockHash()) return 'MISMATCH_HASH';
+        if(this.getBlockVersionHex() !== otherBlock.getBlockVersionHex()) return 'MISMATCH_VERSIONHEX';
+        if(this.getBlockBits() !== otherBlock.getBlockBits()) return 'MISMATCH_BITS';
+        if(this.getBlockMerkleRoot() !== otherBlock.getBlockMerkleRoot()) return 'MISMATCH_MERKLEROOT';
+        if(this.getBlockSize() !== otherBlock.getBlockSize()) return 'MISMATCH_SIZE';
+        if(this.getBlockDifficulty() !== otherBlock.getBlockDifficulty()) return 'MISMATCH_DIFF';
+        if(this.getBlockTime() !== otherBlock.getBlockTime()) return 'MISMATCH_TIME';
+        return 'CLEAN';
+    }
+
 
     /**
      * Converts the dataObject to a json string.

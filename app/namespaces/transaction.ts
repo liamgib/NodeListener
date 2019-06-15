@@ -12,7 +12,8 @@ export class Transaction {
         time: 0,
         height: -1,
         senders: {},
-        receivers: {}
+        receivers: {},
+        failureCode: ""
     }
     
 
@@ -56,10 +57,17 @@ export class Transaction {
     }
 
 
+    public setFailureCode(failureCode:string){
+        this.dataObject.failureCode = failureCode;
+    }
 
     /*
      ------------- Get functions -------------
     */
+
+    public getFailureCode() {
+        return this.dataObject.failureCode;
+    }
 
     /** 
      * Will calculate the fee from the discrepancy between total sent and recieved.
@@ -76,6 +84,14 @@ export class Transaction {
      */
     public getTransactionID():string {
         return this.dataObject.transactionID;
+    }
+
+
+    /**
+     * Used to change the transaction ID when testing rejected transactions.
+     */
+    public setTransactionID(txid:string) {
+        this.dataObject.transactionID = txid;
     }
 
     /**
@@ -126,7 +142,6 @@ export class Transaction {
     public getReceivers():any {
         return this.dataObject.receivers;
     }
-
 
     /**
      * Returns the block height of the transaction.

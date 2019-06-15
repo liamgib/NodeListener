@@ -1,8 +1,14 @@
 import {interface_handler} from '../rpc_interface/interface_handler';
 import {database_handler} from '../postgres/database_handler';
 import { timeout, TimeoutError } from 'promise-timeout';
-import {confirmed_deposit, unconfirmed_deposit, confirmed_withdraw, unconfirmed_withdraw} from '../events';
+import {confirmed_deposit, unconfirmed_deposit, confirmed_withdraw, unconfirmed_withdraw, mempool_deposit, mempool_withdraw} from '../events';
+var zmq = require('zmq')
+var sock = zmq.socket('sub');
+import { Transaction } from './transaction';
+const Sentry = require('@sentry/node');
+Sentry.init({ dsn: 'https://da70988269814bfeaa532dfda53575da@sentry.io/1480311' });
 
+import _ = require('lodash');
 
 
 
@@ -20,10 +26,12 @@ export class sync_manager {
     private unconfirmed_deposit_event:unconfirmed_deposit;
     private confirmed_withdraw_event:confirmed_withdraw;
     private unconfirmed_withdraw_event:unconfirmed_withdraw;
+    private mempool_deposit_event:mempool_deposit;
+    private mempool_withdraw_event:mempool_withdraw;
+    private hasSynced = false;
 
 
-
-    constructor(rpc:interface_handler, db:database_handler, confirmed_deposit_event: confirmed_deposit, unconfirmed_deposit_event: unconfirmed_deposit, confirmed_withdraw_event: confirmed_withdraw, unconfirmed_withdraw_event: unconfirmed_withdraw){
+    constructor(rpc:interface_handler, db:database_handler, confirmed_deposit_event: confirmed_deposit, unconfirmed_deposit_event: unconfirmed_deposit, confirmed_withdraw_event: confirmed_withdraw, unconfirmed_withdraw_event: unconfirmed_withdraw, mempool_deposit: mempool_deposit, mempool_withdraw: mempool_withdraw){
         this.rpc_instance = rpc;
         this.database = db;
         this.status = 'STARTING';
@@ -31,6 +39,8 @@ export class sync_manager {
         this.unconfirmed_deposit_event = unconfirmed_deposit_event;
         this.confirmed_withdraw_event = confirmed_withdraw_event;
         this.unconfirmed_withdraw_event = unconfirmed_withdraw_event;
+        this.mempool_deposit_event = mempool_deposit;
+        this.mempool_withdraw_event = mempool_withdraw;
     }
 
     /**
@@ -52,11 +62,21 @@ export class sync_manager {
         this.unconfirmed_withdraw_event.addSubscriber((data) => {
             console.log("unconfirmed Withdraw", data);
         });
+
+        this.mempool_deposit_event.addSubscriber((data) => {
+            console.log("Mempool deposit", data);
+        });
+
+        this.mempool_withdraw_event.addSubscriber((data) => {
+            console.log("Mempool withdraw", data);
+        });
+    
     }
 
     public async startFullSync() {
         this.status = 'WAITING';
         const databaseHeight = await this.database.getDatabaseHeight();
+        this.rpc_instance.blockHeight = databaseHeight;
         this.rpcHeight = await this.rpc_instance.getBlockCount();
         this.launchedDate = new Date();
         const diff = Math.abs(this.rpcHeight - databaseHeight);
@@ -64,11 +84,16 @@ export class sync_manager {
         console.log("Loaded database height:", databaseHeight);
         console.log("Loaded RPC height:", this.rpcHeight);
         console.log("Difference:", diff);
-        console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+        console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         this.registerEvents();
+        this.confirmBlocks(databaseHeight);
+        this.rpc_instance.startMempoolListen(this.database);
+        //const dbBlock = await this.database.getBlock(265084);
+        //const rpcBlock = await this.rpc_instance.getBlock(265084);
         if(databaseHeight !== this.rpcHeight) {
             this.loopSyncFunc(databaseHeight + 1);
         }else{
+            this.hasSynced = true;
             this.listenUpdates();
         }
     }
@@ -81,11 +106,14 @@ export class sync_manager {
         this.rpc_instance.getBlock(block_id).then(block => {
             console.log("Creating new Block #" + block_id + ":", isConfirmed);
             console.log("  >> Loaded block #" + block_id);
-            timeout(this.database.insertBlock(block, isConfirmed).then(ifOkay => {
+            timeout(this.database.insertBlock(block, isConfirmed).then(async ifOkay => {
                 console.log("  >> Created Block #" + block_id);
+                //Block confirmation 3 blocks ago...
+               if(!isConfirmed) await this.confirmBlocks(block_id);
                 block_id++;
-                this.loopSyncFunc(block_id);
+                if(!this.hasSynced) this.loopSyncFunc(block_id);
             }).catch((e) => {
+                Sentry.captureMessage(new Error(e));
                 console.log("Error creating block #" + block_id);
             }), 10000).catch((err) => {
                 if (err instanceof TimeoutError) {
@@ -101,6 +129,8 @@ export class sync_manager {
             //A few coins have the starting block at 0.
             if(this.rpcHeight < block_id){
                 //Fully synced! 
+                this.hasSynced = true;
+                this.rpc_instance.blockHeight = this.rpcHeight;
                 console.log('Synced to latest height!');
                 this.status = 'WAITING';
                 //Start check for future updates.
@@ -120,16 +150,29 @@ export class sync_manager {
 
     private async listenUpdates(){
         console.log('Listening for block updates.');
-        this.listeningUpdateID = setInterval(async () => {
-            const databaseHeight = await this.database.getDatabaseHeight();
-            this.rpcHeight = await this.rpc_instance.getBlockCount();
-            if(databaseHeight !== this.rpcHeight) {
-                clearTimeout(this.listeningUpdateID);
-                this.loopSyncFunc(databaseHeight + 1);
-            }
-        }, 30000);
+        sock.connect('tcp://127.0.0.1:29000');
+        sock.subscribe('hashblock');
+        var self = this;
+        sock.on('message', async function(topic, message) {
+            setTimeout(() => {
+                self.rpc_instance.blockHeight += 1;
+                self.loopSyncFunc(self.rpc_instance.blockHeight);
+            }, 500);
+        });
+        
     }
 
+
+    private async confirmBlocks(latestHeight) {
+        const unConfirmedBlocks = await this.database.getUnconfirmedBlocks(latestHeight);
+        if(unConfirmedBlocks === null) return false;
+        for(let i = 0, len = unConfirmedBlocks.length; i < len; i++){
+            const dbBlock = await this.database.getBlock(unConfirmedBlocks[i]["height"]);
+            const rpcBlock = await this.rpc_instance.getBlock(unConfirmedBlocks[i]["height"]);
+            await this.database.verifyBlock(rpcBlock, dbBlock);
+            if(i == unConfirmedBlocks.length - 1) return true;
+        }
+    }
     /**
      * Returns the current status of the sync manager.
      */

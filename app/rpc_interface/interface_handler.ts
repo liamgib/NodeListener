@@ -1,15 +1,64 @@
 declare function require(name:string);
-var bitcoin_rpc = require('node-bitcoin-rpc')
+var bitcoin_rpc = require('node-bitcoin-rpc');
+var zmq = require('zmq')
+var sock = zmq.socket('sub');
 import {Block} from '../namespaces/block';
 import {Transaction} from '../namespaces/transaction';
-
+import {database_handler} from '../postgres/database_handler';
 
 export class interface_handler{
 
+
+    private database:database_handler;
+    public blockHeight:number;
     constructor(){
-        bitcoin_rpc.init('0.0.0.0', 18339, 'NOGdLCSui8', 'yOKFop6v7IjFwvr7uDVGbQ')
+        const user = 'NOGdLCSui8';
+        const pass = 'yOKFop6v7IjFwvr7uDVGbQ';
+        const port = 18339;
+        const host = '0.0.0.0';
+        bitcoin_rpc.init(host, port, user, pass);
     }
 
+
+    /**
+     * Start listening to mempool transactions.
+     */
+    public async startMempoolListen(database:database_handler) {
+        this.database = database;
+        var self = this;
+        sock.connect('tcp://127.0.0.1:29000');
+        sock.on('message', async function(topic, message) {
+            //Decode
+            bitcoin_rpc.call('decoderawtransaction', [message.toString('hex')], async function (err, res) {
+              if(res.error == null) {
+                    //Convert to transaction instance
+                    let newTransaction = new Transaction(res.result.txid, res.result.version, res.result.size, new Date().getTime(), self.blockHeight + 1);
+                    //Loop through receievers
+                    for(var it = 0, lent = res.result.vout.length; it < lent; it++){
+                        if(res.result.vout[it].scriptPubKey.type !== 'nulldata') newTransaction.addReciever(res.result.vout[it].scriptPubKey.addresses[0], res.result.vout[it].value);
+                        if(it == lent - 1) for(var i = 0, lena = res.result.vin.length; i < lena; i++){
+                            if(res.result.vin[i].coinbase !== undefined){
+                                newTransaction.addSender('NEWCOINS', newTransaction.getTotalRecieved());
+                                if(i + 1 == lena){
+                                    await database.insertMemPoolTransactionQuery(newTransaction);
+                                }
+                            }else{
+                                await self.getSenderAddressANDAmount(res.result.vin[i].txid, res.result.vin[i].vout).then(async result => {
+                                    newTransaction.addSender(result["address"], result["amount"]);
+                                    if(i + 1 == lena){
+                                        await database.insertMemPoolTransactionQuery(newTransaction);
+                                    }
+                                });
+                            }
+                        }
+                    }
+              }else{
+                  console.log("ERROR", res, err);
+              }
+            });
+        });
+        sock.subscribe('rawtx');
+    }
 
     /**
      * Get block current block height from the digital currency RPC.
