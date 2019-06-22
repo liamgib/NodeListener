@@ -4,7 +4,6 @@ import { timeout, TimeoutError } from 'promise-timeout';
 import {confirmed_deposit, unconfirmed_deposit, confirmed_withdraw, unconfirmed_withdraw, mempool_deposit, mempool_withdraw} from '../events';
 var zmq = require('zmq')
 var sock = zmq.socket('sub');
-import { Transaction } from './transaction';
 const Sentry = require('@sentry/node');
 Sentry.init({ dsn: 'https://da70988269814bfeaa532dfda53575da@sentry.io/1480311' });
 
@@ -20,7 +19,7 @@ export class sync_manager {
     private rpcHeight:number;
     private launchedDate:Date;
     private isRetry:boolean = false;
-    private listeningUpdateID:timeout;
+    private listeningUpdateID:any;
     private TOTAL_CONFIRMATIONS = 3;
     private confirmed_deposit_event:confirmed_deposit;
     private unconfirmed_deposit_event:unconfirmed_deposit;
@@ -47,27 +46,27 @@ export class sync_manager {
      * EVENTS
      */
     private async registerEvents(){
-       this.confirmed_deposit_event.addSubscriber((data) => {
+       this.confirmed_deposit_event.addSubscriber((data:any) => {
             console.log("Confirmed Deposit", data);
         });
 
-        this.unconfirmed_deposit_event.addSubscriber((data) => {
+        this.unconfirmed_deposit_event.addSubscriber((data:any) => {
             console.log("Unconfirmed Deposit", data);
         });
 
-        this.confirmed_withdraw_event.addSubscriber((data) => {
+        this.confirmed_withdraw_event.addSubscriber((data:any) => {
             console.log("Confirmed Withdraw", data);
         });
 
-        this.unconfirmed_withdraw_event.addSubscriber((data) => {
+        this.unconfirmed_withdraw_event.addSubscriber((data:any) => {
             console.log("unconfirmed Withdraw", data);
         });
 
-        this.mempool_deposit_event.addSubscriber((data) => {
+        this.mempool_deposit_event.addSubscriber((data:any) => {
             console.log("Mempool deposit", data);
         });
 
-        this.mempool_withdraw_event.addSubscriber((data) => {
+        this.mempool_withdraw_event.addSubscriber((data:any) => {
             console.log("Mempool withdraw", data);
         });
     
@@ -153,7 +152,7 @@ export class sync_manager {
         sock.connect('tcp://127.0.0.1:29000');
         sock.subscribe('hashblock');
         var self = this;
-        sock.on('message', async function(topic, message) {
+        sock.on('message', async function(topic:string, message:string) {
             setTimeout(() => {
                 self.rpc_instance.blockHeight += 1;
                 self.loopSyncFunc(self.rpc_instance.blockHeight);
@@ -163,7 +162,7 @@ export class sync_manager {
     }
 
 
-    private async confirmBlocks(latestHeight) {
+    private async confirmBlocks(latestHeight:number) {
         const unConfirmedBlocks = await this.database.getUnconfirmedBlocks(latestHeight);
         if(unConfirmedBlocks === null) return false;
         for(let i = 0, len = unConfirmedBlocks.length; i < len; i++){

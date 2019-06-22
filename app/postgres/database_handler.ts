@@ -1,4 +1,3 @@
-declare function require(name:string);
 import {Pool, PoolClient} from 'pg';
 import {Block} from '../namespaces/block';
 import {Transaction} from '../namespaces/transaction';
@@ -128,7 +127,7 @@ export class database_handler {
      */
     private insertTransactionQuery(poolClient:PoolClient, BlockInstance:Block, transactionID:number, isConfirmed: boolean) {
         let transaction:Transaction = BlockInstance.getTransactions()[transactionID];
-        return new Promise<object>(async (resolve, reject) => {
+        return new Promise<any>(async (resolve, reject) => {
             try {
                 const res = await poolClient.query('SELECT * from mempooltransactions where transactionid = $1', [transaction.getTransactionID()]);
                 let failed = false;
@@ -572,8 +571,8 @@ export class database_handler {
     }
 
 
-    public getUnconfirmedBlocks(latestHeight:number):Promise<Array<Object>>{
-        return new Promise<Array<Object>>(async (resolve, reject) => {
+    public getUnconfirmedBlocks(latestHeight:number):Promise<Array<any>>{
+        return new Promise<Array<any>>(async (resolve, reject) => {
             try {
                 const res = await this.pool.query('SELECT height from blocks where confirmed=false and height <= $1;', [latestHeight - 3]);
                 if(res.rows.length == 0) return resolve(null);

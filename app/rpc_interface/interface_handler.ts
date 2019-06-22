@@ -1,4 +1,3 @@
-declare function require(name:string);
 var bitcoin_rpc = require('node-bitcoin-rpc');
 var zmq = require('zmq')
 var sock = zmq.socket('sub');
@@ -27,9 +26,9 @@ export class interface_handler{
         this.database = database;
         var self = this;
         sock.connect('tcp://127.0.0.1:29000');
-        sock.on('message', async function(topic, message) {
+        sock.on('message', async function(topic:string, message:any) {
             //Decode
-            bitcoin_rpc.call('decoderawtransaction', [message.toString('hex')], async function (err, res) {
+            bitcoin_rpc.call('decoderawtransaction', [message.toString('hex')], async function (err:any, res:any) {
               if(res.error == null) {
                     //Convert to transaction instance
                     let newTransaction = new Transaction(res.result.txid, res.result.version, res.result.size, new Date().getTime(), self.blockHeight + 1);
@@ -66,7 +65,7 @@ export class interface_handler{
      */
     public async getBlockCount():Promise<number> {
         return new Promise<number>(resolve => {
-            bitcoin_rpc.call('getblockcount', [], function (err, res) {
+            bitcoin_rpc.call('getblockcount', [], function (err:any, res:any) {
                 if (err !== null) {
                     resolve(-1);
                 } else {
@@ -86,17 +85,17 @@ export class interface_handler{
         return new Promise<Block>(async (resolve, reject) => {
             // Retreive the block hash for the block Height.
             try {
-            await bitcoin_rpc.call('getblockhash', [blockHeight], async function (err, res) {
+            await bitcoin_rpc.call('getblockhash', [blockHeight], async function (err:any, res:any) {
                 if (err !== null || res.result === null) return reject();
                 //Retrieve the block data from the hash.
-                await bitcoin_rpc.call('getblock', [res.result, 1], async function (err, res) {
+                await bitcoin_rpc.call('getblock', [res.result, 1], async function (err:any, res:any) {
                     //Map to a block class instance.
                     if (err !== null || res.result === null) return reject();
                     let newBlock = new Block(blockHeight, res.result.hash, res.result.size, res.result.version, res.result.versionHex, res.result.merkleroot, res.result.time, res.result.nonce, res.result.chainwork, res.result.bits, res.result.difficulty, res.result.confirmations);
                     let txCounter = 0;
                     for (var icounter = 0, len = res.result.tx.length; icounter < len; icounter++) {
                         //Lookup raw transaction
-                        await bitcoin_rpc.call('getrawtransaction', [res.result.tx[icounter], 1], async function (err, res) {
+                        await bitcoin_rpc.call('getrawtransaction', [res.result.tx[icounter], 1], async function (err:any, res:any) {
                             if (err !== null || res.result == null) return reject();  
                             let newTransaction = new Transaction(res.result.txid, res.result.version, res.result.size, res.result.time, blockHeight);
                             //Loop through receievers
@@ -139,8 +138,8 @@ export class interface_handler{
      */
     private async getSenderAddressANDAmount(txid:string, vout:number) {
         var self = this;
-        return new Promise<Object>((resolve, reject) => {
-            bitcoin_rpc.call('getrawtransaction', [txid, 1], async function (err, resa) {
+        return new Promise<any>((resolve, reject) => {
+            bitcoin_rpc.call('getrawtransaction', [txid, 1], async function (err:any, resa:any) {
                 if(err !== null){
                      setTimeout(function(){
                         resolve(self.getSenderAddressANDAmount(txid, vout));
@@ -161,8 +160,27 @@ export class interface_handler{
         return true;
     }
 
-    public async confirmBlocks(requiredConfirmations: number) {
-
+     /**
+     * Get block current block height from the digital currency RPC.
+     * @returns {Promise<string>} The promise resolves the block height.
+     */
+    public async getNewAddress(invoiceID:string):Promise<string> {
+        return new Promise<string>(resolve => {
+            bitcoin_rpc.call('getnewaddress', [], function (err:any, res:any) {
+                if (err !== null) {
+                    resolve('a');
+                } else {
+                    let address = res.result;
+                    bitcoin_rpc.call('setaccount', [res.result, `INV${invoiceID}`], function (err:any, res:any) {
+                        if (err !== null) {
+                            resolve('a');
+                        } else {
+                            resolve(address);
+                        }
+                    });
+                }
+            });
+        });
     }
 
 
