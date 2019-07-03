@@ -165,16 +165,19 @@ export class interface_handler{
      * @returns {Promise<string>} The promise resolves the block height.
      */
     public async getNewAddress(invoiceID:string):Promise<string> {
+        var self = this;
         return new Promise<string>(resolve => {
             bitcoin_rpc.call('getnewaddress', [], function (err:any, res:any) {
                 if (err !== null) {
-                    resolve('a');
+                    resolve('');
                 } else {
                     let address = res.result;
-                    bitcoin_rpc.call('setaccount', [res.result, `INV${invoiceID}`], function (err:any, res:any) {
+                    bitcoin_rpc.call('setaccount', [res.result, `INV${invoiceID}`], async function (err:any, res:any) {
                         if (err !== null) {
-                            resolve('a');
+                            resolve('');
                         } else {
+                            let insertInvoiceAddress = await self.database.insertInvoiceAddress(address, {invoiceID: invoiceID});
+                            if(!insertInvoiceAddress) address = '';
                             resolve(address);
                         }
                     });

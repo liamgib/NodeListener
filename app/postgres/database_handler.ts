@@ -215,10 +215,10 @@ export class database_handler {
                         }
                     }
                     for (var i = 0, len = Object.keys(transaction.getSenders()).length; i < len; i++) {
-                        const res = await poolClient.query("SELECT events from addresses where address = $1 and events is not null", [Object.keys(transaction.getReceivers())[i]]);
+                        const res = await poolClient.query("SELECT events from addresses where address = $1 and events is not null", [Object.keys(transaction.getSenders())[i]]);
                         if(res.rowCount > 0){
-                            if(isConfirmed) this.confirmed_deposit_event.triggerEvent({address: Object.keys(transaction.getReceivers())[i], amount: transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], events: res.rows[0].events});
-                            if(!isConfirmed) this.unconfirmed_deposit_event.triggerEvent({address: Object.keys(transaction.getReceivers())[i], amount: -transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], events: res.rows[0].events});
+                            if(isConfirmed) this.confirmed_withdraw_event.triggerEvent({address: Object.keys(transaction.getSenders())[i], amount: -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], events: res.rows[0].events});
+                            if(!isConfirmed) this.unconfirmed_withdraw_event.triggerEvent({address: Object.keys(transaction.getSenders())[i], amount: -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], events: res.rows[0].events});
                         }
                     }
                     const FEES = await transaction.calculateFee();
@@ -581,6 +581,36 @@ export class database_handler {
                 resolve([-1]);
             }
         });
+    }
+
+    public async insertInvoiceAddress(address:string, invoiceid:any) {
+        const client = await this.pool.connect();
+            await client.query('BEGIN');
+        try {
+            await client.query('INSERT INTO addresses(address, confirmed, unconfirmed, totalreceived, totalsent, created, events) VALUES($1, 0, 0, 0, 0, now(), $2)', [address, invoiceid]);
+            await client.query('COMMIT');
+            return true;
+        } catch (e) {
+            await client.query('ROLLBACK');
+            return false;
+        } finally {
+            client.release();
+        }
+    }
+
+    public async saveFailedTransactionUpdate(data:any, error:string) {
+        const client = await this.pool.connect();
+            await client.query('BEGIN');
+        try {
+            await client.query('INSERT INTO failedtransactionupdates(data, error,  time) VALUES($1, $2, now())', [data, error]);
+            await client.query('COMMIT');
+        } catch (e) {
+            console.log(e, "ERROR");
+            await client.query('ROLLBACK');
+        } finally {
+            client.release();
+        }
+        return true;
     }
 
 }

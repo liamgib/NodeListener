@@ -2,12 +2,13 @@ import {interface_handler} from '../rpc_interface/interface_handler';
 import {database_handler} from '../postgres/database_handler';
 import { timeout, TimeoutError } from 'promise-timeout';
 import {confirmed_deposit, unconfirmed_deposit, confirmed_withdraw, unconfirmed_withdraw, mempool_deposit, mempool_withdraw} from '../events';
+import API from '../api/api';
 var zmq = require('zmq')
 var sock = zmq.socket('sub');
 const Sentry = require('@sentry/node');
 Sentry.init({ dsn: 'https://da70988269814bfeaa532dfda53575da@sentry.io/1480311' });
-
 import _ = require('lodash');
+
 
 
 
@@ -28,9 +29,10 @@ export class sync_manager {
     private mempool_deposit_event:mempool_deposit;
     private mempool_withdraw_event:mempool_withdraw;
     private hasSynced = false;
+    private API:API;
 
 
-    constructor(rpc:interface_handler, db:database_handler, confirmed_deposit_event: confirmed_deposit, unconfirmed_deposit_event: unconfirmed_deposit, confirmed_withdraw_event: confirmed_withdraw, unconfirmed_withdraw_event: unconfirmed_withdraw, mempool_deposit: mempool_deposit, mempool_withdraw: mempool_withdraw){
+    constructor(rpc:interface_handler, db:database_handler, confirmed_deposit_event: confirmed_deposit, unconfirmed_deposit_event: unconfirmed_deposit, confirmed_withdraw_event: confirmed_withdraw, unconfirmed_withdraw_event: unconfirmed_withdraw, mempool_deposit_event: mempool_deposit, mempool_withdraw: mempool_withdraw, API: API){
         this.rpc_instance = rpc;
         this.database = db;
         this.status = 'STARTING';
@@ -38,8 +40,9 @@ export class sync_manager {
         this.unconfirmed_deposit_event = unconfirmed_deposit_event;
         this.confirmed_withdraw_event = confirmed_withdraw_event;
         this.unconfirmed_withdraw_event = unconfirmed_withdraw_event;
-        this.mempool_deposit_event = mempool_deposit;
+        this.mempool_deposit_event = mempool_deposit_event;
         this.mempool_withdraw_event = mempool_withdraw;
+        this.API = API;
     }
 
     /**
@@ -47,30 +50,30 @@ export class sync_manager {
      */
     private async registerEvents(){
        this.confirmed_deposit_event.addSubscriber((data:any) => {
-            console.log("Confirmed Deposit", data);
+            this.API.relayUpdate('CONFIRMED_DEPOSIT', data);
         });
 
         this.unconfirmed_deposit_event.addSubscriber((data:any) => {
-            console.log("Unconfirmed Deposit", data);
+            this.API.relayUpdate('UNCONFIRMED_DEPOSIT', data);
         });
 
         this.confirmed_withdraw_event.addSubscriber((data:any) => {
-            console.log("Confirmed Withdraw", data);
+            this.API.relayUpdate('CONFIRMED_WITHDRAW', data);
         });
 
         this.unconfirmed_withdraw_event.addSubscriber((data:any) => {
-            console.log("unconfirmed Withdraw", data);
+            this.API.relayUpdate('UNCONFIRMED_WITHDRAW', data);
         });
 
         this.mempool_deposit_event.addSubscriber((data:any) => {
-            console.log("Mempool deposit", data);
+            this.API.relayUpdate('MEMPOOL_DEPOSIT', data);
         });
 
         this.mempool_withdraw_event.addSubscriber((data:any) => {
-            console.log("Mempool withdraw", data);
+            this.API.relayUpdate('MEMPOOL_WITHDRAW', data);
         });
-    
     }
+
 
     public async startFullSync() {
         this.status = 'WAITING';
