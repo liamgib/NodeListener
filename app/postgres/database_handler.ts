@@ -194,31 +194,31 @@ export class database_handler {
                     }
                 });
                 await checkTransaction();
-                await poolClient.query('INSERT INTO transactions(transactionid, version, size, totalsent, totalrecieved, totalfee, senders, receivers, time, confirmed, height) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)', [transaction.getTransactionID(), transaction.getVersion(), transaction.getSize(), transaction.getTotalSent(), transaction.getTotalRecieved(), transaction.calculateFee(), transaction.getSenders(), transaction.getReceivers(), transaction.getTime(), isConfirmed, transaction.getHeight()]);
+                await poolClient.query('INSERT INTO transactions(transactionid, version, size, totalsent, totalrecieved, totalfee, senders, receivers, time, confirmed, height, opreturns, opreturnvalues) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)', [transaction.getTransactionID(), transaction.getVersion(), transaction.getSize(), transaction.getTotalSent(), transaction.getTotalRecieved(), transaction.calculateFee(), transaction.getSenders(), transaction.getReceivers(), transaction.getTime(), isConfirmed, transaction.getHeight(), transaction.getOPReturns(), transaction.getOPReturnValues()]);
                 if(!hasMempool){
                     for (var i = 0, len = Object.keys(transaction.getReceivers()).length; i < len; i++) {
-                        await this.insertAddressQuery(poolClient, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], isConfirmed);
+                        await this.insertAddressQuery(poolClient, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], isConfirmed, false, transaction.getTransactionID());
                     }
                     for (var i = 0, len = Object.keys(transaction.getSenders()).length; i < len; i++) {
-                        await this.insertAddressQuery(poolClient, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], isConfirmed);
+                        await this.insertAddressQuery(poolClient, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], isConfirmed, false, transaction.getTransactionID());
                     }
                     const FEES = await transaction.calculateFee();
-                    if(FEES !== 0) await this.insertAddressQuery(poolClient, 'FEES', FEES, isConfirmed);
+                    if(FEES !== 0) await this.insertAddressQuery(poolClient, 'FEES', FEES, isConfirmed, false, transaction.getTransactionID());
                 }else{
                     //Send events
                     for (var i = 0, len = Object.keys(transaction.getReceivers()).length; i < len; i++) {
                         //Get events
                         const res = await poolClient.query("SELECT events from addresses where address = $1 and events is not null", [Object.keys(transaction.getReceivers())[i]]);
                         if(res.rowCount > 0){
-                            if(isConfirmed) this.confirmed_deposit_event.triggerEvent({address: Object.keys(transaction.getReceivers())[i], amount: transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], events: res.rows[0].events});
-                            if(!isConfirmed) this.unconfirmed_deposit_event.triggerEvent({address: Object.keys(transaction.getReceivers())[i], amount: transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], events: res.rows[0].events});
+                            if(isConfirmed) this.confirmed_deposit_event.triggerEvent({address: Object.keys(transaction.getReceivers())[i], amount: transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], events: res.rows[0].events, transactionID: transaction.getTransactionID()});
+                            if(!isConfirmed) this.unconfirmed_deposit_event.triggerEvent({address: Object.keys(transaction.getReceivers())[i], amount: transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], events: res.rows[0].events, transactionID: transaction.getTransactionID()});
                         }
                     }
                     for (var i = 0, len = Object.keys(transaction.getSenders()).length; i < len; i++) {
                         const res = await poolClient.query("SELECT events from addresses where address = $1 and events is not null", [Object.keys(transaction.getSenders())[i]]);
                         if(res.rowCount > 0){
-                            if(isConfirmed) this.confirmed_withdraw_event.triggerEvent({address: Object.keys(transaction.getSenders())[i], amount: -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], events: res.rows[0].events});
-                            if(!isConfirmed) this.unconfirmed_withdraw_event.triggerEvent({address: Object.keys(transaction.getSenders())[i], amount: -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], events: res.rows[0].events});
+                            if(isConfirmed) this.confirmed_withdraw_event.triggerEvent({address: Object.keys(transaction.getSenders())[i], amount: -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], events: res.rows[0].events, transactionID: transaction.getTransactionID()});
+                            if(!isConfirmed) this.unconfirmed_withdraw_event.triggerEvent({address: Object.keys(transaction.getSenders())[i], amount: -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], events: res.rows[0].events, transactionID: transaction.getTransactionID()});
                         }
                     }
                     const FEES = await transaction.calculateFee();
@@ -239,7 +239,7 @@ export class database_handler {
      * @param {Number} balance The balance to add or subtract from the address.
      * @param {boolean} isConfirmed If the transaction update is confirmed ( > x amount of confirmations to prevent false transactions).
      */
-    private insertAddressQuery(poolClient:PoolClient, address:string, balance:number, isConfirmed:boolean, isMempool = false) {
+    private insertAddressQuery(poolClient:PoolClient, address:string, balance:number, isConfirmed:boolean, isMempool = false, transactionID:String) {
         const confirmedBalance = isConfirmed ? balance : 0;
         const unconfirmedBalance = !isConfirmed? balance : 0;
         const isSent = balance >= 0 ? false : true; 
@@ -251,13 +251,13 @@ export class database_handler {
                 const res = await poolClient.query("UPDATE addresses SET confirmed = confirmed + $2, unconfirmed = unconfirmed + $3, totalreceived = totalreceived + $4, totalsent = totalsent + $5 where address=$1 RETURNING events", [address, confirmedBalance, unconfirmedBalance, totalreceived, totalsent]);
                 if(res.rows[0].events){
                     if(isSent){
-                        if(isConfirmed && isMempool == false) this.confirmed_withdraw_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
-                        if(!isConfirmed && isMempool == false) this.unconfirmed_withdraw_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
-                        if(isMempool) this.mempool_withdraw_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
+                        if(isConfirmed && isMempool == false) this.confirmed_withdraw_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events, transactionID: transactionID});
+                        if(!isConfirmed && isMempool == false) this.unconfirmed_withdraw_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events, transactionID: transactionID});
+                        if(isMempool) this.mempool_withdraw_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events, transactionID: transactionID});
                     }else{
-                        if(isConfirmed && isMempool == false) this.confirmed_deposit_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
-                        if(!isConfirmed && isMempool == false) this.unconfirmed_deposit_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
-                        if(isMempool) this.mempool_deposit_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events});
+                        if(isConfirmed && isMempool == false) this.confirmed_deposit_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events, transactionID: transactionID});
+                        if(!isConfirmed && isMempool == false) this.unconfirmed_deposit_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events, transactionID: transactionID});
+                        if(isMempool) this.mempool_deposit_event.triggerEvent({address: address, amount: balance, events: res.rows[0].events, transactionID: transactionID});
                     }
                 }
                 resolve([true]);
@@ -286,13 +286,13 @@ export class database_handler {
                 if(res.rowCount > 0) return resolve(false);
                 await client.query('INSERT INTO mempooltransactions(transactionid, version, size, totalsent, totalrecieved, totalfee, senders, receivers, time, expectedHeight) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)', [transaction.getTransactionID(), transaction.getVersion(), transaction.getSize(), transaction.getTotalSent(), transaction.getTotalRecieved(), transaction.calculateFee(), transaction.getSenders(), transaction.getReceivers(), transaction.getTime(), transaction.getHeight()]);
                 for (var i = 0, len = Object.keys(transaction.getReceivers()).length; i < len; i++) {
-                    await this.insertAddressQuery(client, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], false, true);
+                    await this.insertAddressQuery(client, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], false, true, transaction.getTransactionID());
                 }
                 for (var i = 0, len = Object.keys(transaction.getSenders()).length; i < len; i++) {
-                    await this.insertAddressQuery(client, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], false, true);
+                    await this.insertAddressQuery(client, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], false, true, transaction.getTransactionID());
                 }
                 const FEES = await transaction.calculateFee();
-                if(FEES !== 0) await this.insertAddressQuery(client, 'FEES', FEES, false);
+                if(FEES !== 0) await this.insertAddressQuery(client, 'FEES', FEES, false, false, transaction.getTransactionID());
                 await client.query('COMMIT');
                 resolve(true);
             } catch(e) {
@@ -449,15 +449,15 @@ export class database_handler {
                 const res = await poolClient.query("UPDATE transactions SET confirmed=true where transactionid=$1", [transaction.getTransactionID()]);
                 for (var i = 0, len = Object.keys(transaction.getReceivers()).length; i < len; i++) {
                     await this.subtractAddressQuery(poolClient, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], false);
-                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], true,);
+                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getReceivers())[i], transaction.getReceivers()[Object.keys(transaction.getReceivers())[i]], true, false, transaction.getTransactionID());
                 }
                 for (var i = 0, len = Object.keys(transaction.getSenders()).length; i < len; i++) {
                     await this.subtractAddressQuery(poolClient, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], false);
-                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], true);
+                    await this.insertAddressQuery(poolClient, Object.keys(transaction.getSenders())[i], -transaction.getSenders()[Object.keys(transaction.getSenders())[i]], true, false, transaction.getTransactionID());
                 }
                 const FEES = await transaction.calculateFee();
                 if(FEES !== 0) await this.subtractAddressQuery(poolClient, 'FEES', FEES, false);
-                if(FEES !== 0) await this.insertAddressQuery(poolClient, 'FEES', FEES, true);
+                if(FEES !== 0) await this.insertAddressQuery(poolClient, 'FEES', FEES, true, false, transaction.getTransactionID());
                 resolve([true, transaction]);
             } catch (e) {
                 reject();

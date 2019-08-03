@@ -33,28 +33,50 @@ export default class API {
 
     public relayUpdate(eventType:string, data:any, isRetry=false):Promise<boolean> {
         return new Promise<boolean>(async (resolve) => {
-            const hmac = crypto.createHmac('sha1', this.session);
-            const digest = 'sha1=' + hmac.update(JSON.stringify({eventType: eventType, ...data})).digest('hex');
-            fetch(`${AUCRYPTO_TRANSACTION}/webhook/invoiceUpdate`, {
-                method: 'post',
-                body: JSON.stringify({eventType: eventType, ...data}),
-                headers: { 'Content-Type': 'application/json', 'X-INTER-AUCRYPTO-SERV': settings.SERVER_ID, 'X-INTER-AUCRYPTO-VERIF': digest }
-            }).then((res:any) => res.json())
-            .then(async (json:any) => {
-                if(json.error !== undefined) {
+            try {
+                const hmac = crypto.createHmac('sha1', this.session);
+                const digest = 'sha1=' + hmac.update(JSON.stringify({eventType: eventType, ...data})).digest('hex');
+                fetch(`${AUCRYPTO_TRANSACTION}/webhook/invoiceUpdate`, {
+                    method: 'post',
+                    body: JSON.stringify({eventType: eventType, ...data}),
+                    headers: { 'Content-Type': 'application/json', 'X-INTER-AUCRYPTO-SERV': settings.SERVER_ID, 'X-INTER-AUCRYPTO-VERIF': digest }
+                }).then((res:any) => res.json())
+                .then(async (json:any) => {
+                    if(json.error !== undefined) {
+                        if(isRetry == true) {
+                            //Save into db to retry.
+                            this.database.saveFailedTransactionUpdate({eventType: eventType, ...data}, json.error);
+                            return resolve(false);
+                        }else{
+                            //Retry
+                            let retry = await this.relayUpdate(eventType, data, true);
+                            return resolve(retry);
+                        }
+                    } else {
+                        return resolve(true);
+                    }
+                }).catch(async (err:any) => {
                     if(isRetry == true) {
                         //Save into db to retry.
-                        this.database.saveFailedTransactionUpdate({eventType: eventType, ...data}, json.error);
+                        this.database.saveFailedTransactionUpdate({eventType: eventType, ...data}, err);
                         return resolve(false);
                     }else{
                         //Retry
                         let retry = await this.relayUpdate(eventType, data, true);
                         return resolve(retry);
                     }
-                } else {
-                    return resolve(true);
+                });
+            } catch(err) {
+                if(isRetry == true) {
+                    //Save into db to retry.
+                    this.database.saveFailedTransactionUpdate({eventType: eventType, ...data}, err);
+                    return resolve(false);
+                }else{
+                    //Retry
+                    let retry = await this.relayUpdate(eventType, data, true);
+                    return resolve(retry);
                 }
-            });
+            }
         });
     }
 }

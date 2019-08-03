@@ -13,6 +13,7 @@ export class Transaction {
         height: -1,
         senders: {},
         receivers: {},
+        opreturns: [],
         failureCode: ""
     }
     
@@ -56,6 +57,22 @@ export class Transaction {
         }
     }
 
+
+    /**
+     * Adds Hex Data to the transaction
+     * @param hex Hex Data
+     */
+    public addOpReturn(hex:string):void {
+        this.dataObject.opreturns.push({hex: hex, text: this.convertHex(hex)});
+    }
+
+    private convertHex(hex:string):string {
+        var hex = hex.toString();//force conversion
+        var str = '';
+        for (var i = 0; (i < hex.length && hex.substr(i, 2) !== '00'); i += 2)
+            str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+        return str;
+    }
 
     public setFailureCode(failureCode:string){
         this.dataObject.failureCode = failureCode;
@@ -151,6 +168,20 @@ export class Transaction {
         return this.dataObject.height;
     }
     
+    /**
+     * Returns the OP Return object
+     */
+    public getOPReturns():any {
+        return this.dataObject.opreturns;
+    }
+
+    /**
+     * Returns the OP Return values
+     */
+    public getOPReturnValues():any {
+        if(this.dataObject.opreturns.length == 0) return [];
+        return this.dataObject.opreturns.map(item => item.text);
+    }
     /**
      * Converts the dataObject to a json string.
      */

@@ -35,6 +35,7 @@ export class interface_handler{
                     //Loop through receievers
                     for(var it = 0, lent = res.result.vout.length; it < lent; it++){
                         if(res.result.vout[it].scriptPubKey.type !== 'nulldata') newTransaction.addReciever(res.result.vout[it].scriptPubKey.addresses[0], res.result.vout[it].value);
+                        if(res.result.vout[it].scriptPubKey.type == 'nulldata' && res.result.vout[it].scriptPubKey.asm.startsWith('OP_RETURN')) newTransaction.addOpReturn(res.result.vout[it].scriptPubKey.asm.split(' ')[1])
                         if(it == lent - 1) for(var i = 0, lena = res.result.vin.length; i < lena; i++){
                             if(res.result.vin[i].coinbase !== undefined){
                                 newTransaction.addSender('NEWCOINS', newTransaction.getTotalRecieved());
