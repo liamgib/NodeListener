@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 const settings = require('../config/settings.json');
-const AUCRYPTO_TRANSACTION = 'http://0.0.0.0:3001';
+const AUCRYPTO_TRANSACTION = 'http://127.0.0.1:8001';
 import crypto from "crypto";
 import { database_handler } from "../postgres/database_handler";
 export default class API {

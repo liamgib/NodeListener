@@ -2,6 +2,7 @@ import {sync_manager} from './namespaces/sync_manager';
 import {interface_handler} from './rpc_interface/interface_handler';
 import {database_handler} from './postgres/database_handler';
 import {confirmed_deposit, unconfirmed_deposit, confirmed_withdraw, unconfirmed_withdraw, mempool_deposit, mempool_withdraw} from './events';
+const settings = require('./config/settings.json');
 import express from "express";
 import bodyParser from 'body-parser';
 import crypto from "crypto";
@@ -20,7 +21,7 @@ const unconfirmed_withdraw_event = new unconfirmed_withdraw();
 const mempool_deposit_event = new mempool_deposit();
 const mempool_withdraw_event = new mempool_withdraw();
 var rpc = new interface_handler();
-var database = new database_handler('postgres', 'Password123', 'localhost', 5432, 'aucrypto', confirmed_deposit_event, unconfirmed_deposit_event, confirmed_withdraw_event, unconfirmed_withdraw_event, mempool_deposit_event, mempool_withdraw_event);
+var database = new database_handler(settings.COIN_DETAILS.DB_USER, settings.COIN_DETAILS.DB_PASS, settings.COIN_DETAILS.DB_HOST, settings.COIN_DETAILS.DB_PORT, settings.COIN_DETAILS.DB_DATABASE, confirmed_deposit_event, unconfirmed_deposit_event, confirmed_withdraw_event, unconfirmed_withdraw_event, mempool_deposit_event, mempool_withdraw_event);
 var API_HANDLER = new API(database);
 var sync = new sync_manager(rpc, database, confirmed_deposit_event, unconfirmed_deposit_event, confirmed_withdraw_event, unconfirmed_withdraw_event, mempool_deposit_event, mempool_withdraw_event, API_HANDLER);
 
@@ -64,10 +65,10 @@ app.use((err:any, req:any, res:any, next:any) => {
     res.status(403).send({error: 'Request body was not signed or verification failed'});
 });
 
-app.listen(2001, '127.0.0.1', async () => {
+app.listen(settings.COIN_DETAILS.NL_PORT, settings.COIN_DETAILS.NL_HOST, async () => {
     //Login with AUCRYPTO_TRANSACTION
     await loginServer();
-    console.log('AUCRYPTO - NodeListener started → PORT 2001');
+    console.log(`AUCRYPTO - NodeListener started → PORT ${settings.COIN_DETAILS.NL_PORT}`);
 });
 
 async function loginServer() {

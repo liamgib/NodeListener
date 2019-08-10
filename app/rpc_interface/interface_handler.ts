@@ -4,6 +4,7 @@ var sock = zmq.socket('sub');
 import {Block} from '../namespaces/block';
 import {Transaction} from '../namespaces/transaction';
 import {database_handler} from '../postgres/database_handler';
+const settings = require('../config/settings.json');
 
 export class interface_handler{
 
@@ -11,21 +12,21 @@ export class interface_handler{
     private database:database_handler;
     public blockHeight:number;
     constructor(){
-        const user = 'NOGdLCSui8';
-        const pass = 'yOKFop6v7IjFwvr7uDVGbQ';
-        const port = 18339;
-        const host = '0.0.0.0';
+        const user = settings.COIN_DETAILS.RPC_USER;
+        const pass = settings.COIN_DETAILS.RPC_PASS;
+        const port = settings.COIN_DETAILS.RPC_PORT;
+        const host = settings.COIN_DETAILS.RPC_HOST;
         bitcoin_rpc.init(host, port, user, pass);
     }
 
-
+    
     /**
      * Start listening to mempool transactions.
      */
     public async startMempoolListen(database:database_handler) {
         this.database = database;
         var self = this;
-        sock.connect('tcp://127.0.0.1:29000');
+        sock.connect(settings.COIN_DETAILS.ZMQ);
         sock.on('message', async function(topic:string, message:any) {
             //Decode
             bitcoin_rpc.call('decoderawtransaction', [message.toString('hex')], async function (err:any, res:any) {
@@ -53,7 +54,7 @@ export class interface_handler{
                         }
                     }
               }else{
-                  console.log("ERROR", res, err);
+                  //console.log("ERROR", res, err);
               }
             });
         });

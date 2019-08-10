@@ -8,7 +8,7 @@ var sock = zmq.socket('sub');
 const Sentry = require('@sentry/node');
 Sentry.init({ dsn: 'https://da70988269814bfeaa532dfda53575da@sentry.io/1480311' });
 import _ = require('lodash');
-
+const settings = require('../config/settings.json');
 
 
 
@@ -152,7 +152,7 @@ export class sync_manager {
 
     private async listenUpdates(){
         console.log('Listening for block updates.');
-        sock.connect('tcp://127.0.0.1:29000');
+        sock.connect(settings.COIN_DETAILS.ZMQ);
         sock.subscribe('hashblock');
         var self = this;
         sock.on('message', async function(topic:string, message:string) {
