@@ -2,6 +2,18 @@
     "compilerOptions": {
         "target": "esnext",
         "module": "commonjs",
-        "outDir": "./build"
-    }
+        "outDir": "./build",
+        "esModuleInterop": true,
+        "noImplicitAny": false,
+        "moduleResolution": "node",
+        "baseUrl": ".",
+        "paths": {
+            "*": [
+                "node_modules/*"
+            ]
+        }
+    },
+    "include": [
+        "app/**/*", "test"
+    ]
 }

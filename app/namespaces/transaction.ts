@@ -9,16 +9,22 @@ export class Transaction {
         totalSent: 0,
         totalRecieved: 0,
         totalFee: 0,
+        time: 0,
+        height: -1,
         senders: {},
-        receivers: {}
+        receivers: {},
+        opreturns: [],
+        failureCode: ""
     }
     
 
 
-    constructor(txid: string, version: number, size: number){
+    constructor(txid: string, version: number, size: number, time: number, height: number){
         this.dataObject.transactionID = txid;
         this.dataObject.version = version;
         this.dataObject.size = size;
+        this.dataObject.time = time;
+        this.dataObject.height = height;
     }
 
 
@@ -52,10 +58,33 @@ export class Transaction {
     }
 
 
+    /**
+     * Adds Hex Data to the transaction
+     * @param hex Hex Data
+     */
+    public addOpReturn(hex:string):void {
+        this.dataObject.opreturns.push({hex: hex, text: this.convertHex(hex)});
+    }
+
+    private convertHex(hex:string):string {
+        var hex = hex.toString();//force conversion
+        var str = '';
+        for (var i = 0; (i < hex.length && hex.substr(i, 2) !== '00'); i += 2)
+            str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+        return str;
+    }
+
+    public setFailureCode(failureCode:string){
+        this.dataObject.failureCode = failureCode;
+    }
 
     /*
      ------------- Get functions -------------
     */
+
+    public getFailureCode() {
+        return this.dataObject.failureCode;
+    }
 
     /** 
      * Will calculate the fee from the discrepancy between total sent and recieved.
@@ -74,6 +103,14 @@ export class Transaction {
         return this.dataObject.transactionID;
     }
 
+
+    /**
+     * Used to change the transaction ID when testing rejected transactions.
+     */
+    public setTransactionID(txid:string) {
+        this.dataObject.transactionID = txid;
+    }
+
     /**
      * Returns the version number.
      */
@@ -88,6 +125,13 @@ export class Transaction {
         return this.dataObject.size;
     }
 
+    /**
+     * Returns the time of the transaction.
+     */
+    public getTime():number {
+        return this.dataObject.time;
+    }
+    
     /**
      * Returns the total amount sent in this transaction.
      */
@@ -115,7 +159,29 @@ export class Transaction {
     public getReceivers():any {
         return this.dataObject.receivers;
     }
+
+    /**
+     * Returns the block height of the transaction.
+     * Will return -1 if in mempool.
+     */
+    public getHeight():number {
+        return this.dataObject.height;
+    }
     
+    /**
+     * Returns the OP Return object
+     */
+    public getOPReturns():any {
+        return this.dataObject.opreturns;
+    }
+
+    /**
+     * Returns the OP Return values
+     */
+    public getOPReturnValues():any {
+        if(this.dataObject.opreturns.length == 0) return [];
+        return this.dataObject.opreturns.map(item => item.text);
+    }
     /**
      * Converts the dataObject to a json string.
      */

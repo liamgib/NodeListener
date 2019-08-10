@@ -1,4 +1,6 @@
 *.js
 *.jsx
 node_modules
-/lib
+build
+/app/config/settings.json
+settings.json

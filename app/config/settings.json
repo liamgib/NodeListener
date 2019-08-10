@@ -1,0 +1,18 @@
+{
+    "SERVER_ID": "WEB-AU2153",
+    "ACCESS_KEY": "gYCmyH8iQoNxOoHMbZ76t5PMdHQYULzA9FnFavKD",
+    "COIN_DETAILS": {
+        "RPC_USER": "NOGdLCSui8",
+        "RPC_PASS": "yOKFop6v7IjFwvr7uDVGbQ",
+        "RPC_PORT": 18339,
+        "RPC_HOST": "0.0.0.0",
+        "ZMQ": "tcp://127.0.0.1:29000",
+        "DB_USER": "postgres",
+        "DB_PASS": "Password123",
+        "DB_HOST": "localhost",
+        "DB_PORT": 5432,
+        "DB_DATABASE": "aucrypto",
+        "NL_HOST": "127.0.0.1",
+        "NL_PORT": 7001
+    }
+}
