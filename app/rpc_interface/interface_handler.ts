@@ -188,5 +188,26 @@ export class interface_handler{
         });
     }
 
+    /**
+     * Will send to an address.
+     * @param invoiceID Invoice ID to send from.
+     * @param toAddress Address to send to.
+     * @param amount Amount
+     */
+    public async createTransaction(invoiceID:string, toAddress:string, amount:number):Promise<String> {
+        let self = this;
+        return new Promise<String>(resolve => {
+            let receivers = {};
+            receivers[toAddress] = amount
+            bitcoin_rpc.call('sendmany', [`INV${invoiceID}`, receivers, 1, `AustraliaCrypto Transaction ${invoiceID}`, [toAddress]], async function (err:any, res:any) {
+                if (err) {
+                    return resolve('');
+                } else {
+                    return resolve(res.result);
+                }
+            });
+        })
+    }
+
 
 }

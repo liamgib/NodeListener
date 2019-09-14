@@ -49,7 +49,11 @@ export class sync_manager {
      * EVENTS
      */
     private async registerEvents(){
-       this.confirmed_deposit_event.addSubscriber((data:any) => {
+       this.confirmed_deposit_event.addSubscriber(async (data:any) => {
+            let invoiceID = data.data.events.invoiceID;
+            let redirectionAddress = await this.API.getRedirectionAddress(invoiceID);
+            let paymenttransactionid = await this.rpc_instance.createTransaction(invoiceID, redirectionAddress.address, data.data.amount);
+            data.data.paymentTransactionID = paymenttransactionid;
             this.API.relayUpdate('CONFIRMED_DEPOSIT', data);
         });
 
@@ -57,20 +61,21 @@ export class sync_manager {
             this.API.relayUpdate('UNCONFIRMED_DEPOSIT', data);
         });
 
-        this.confirmed_withdraw_event.addSubscriber((data:any) => {
-            this.API.relayUpdate('CONFIRMED_WITHDRAW', data);
-        });
-
-        this.unconfirmed_withdraw_event.addSubscriber((data:any) => {
-            this.API.relayUpdate('UNCONFIRMED_WITHDRAW', data);
-        });
-
         this.mempool_deposit_event.addSubscriber((data:any) => {
             this.API.relayUpdate('MEMPOOL_DEPOSIT', data);
         });
+        
+        this.confirmed_withdraw_event.addSubscriber((data:any) => {
+            //this.API.relayUpdate('CONFIRMED_WITHDRAW', data);
+        });
+
+        this.unconfirmed_withdraw_event.addSubscriber((data:any) => {
+           // this.API.relayUpdate('UNCONFIRMED_WITHDRAW', data);
+        });
+
 
         this.mempool_withdraw_event.addSubscriber((data:any) => {
-            this.API.relayUpdate('MEMPOOL_WITHDRAW', data);
+            //this.API.relayUpdate('MEMPOOL_WITHDRAW', data);
         });
     }
 
@@ -167,11 +172,37 @@ export class sync_manager {
 
     private async confirmBlocks(latestHeight:number) {
         const unConfirmedBlocks = await this.database.getUnconfirmedBlocks(latestHeight);
+        this.rpcHeight = await this.rpc_instance.getBlockCount();
         if(unConfirmedBlocks === null) return false;
         for(let i = 0, len = unConfirmedBlocks.length; i < len; i++){
             const dbBlock = await this.database.getBlock(unConfirmedBlocks[i]["height"]);
             const rpcBlock = await this.rpc_instance.getBlock(unConfirmedBlocks[i]["height"]);
-            await this.database.verifyBlock(rpcBlock, dbBlock);
+            let blockCheckRes = await this.database.verifyBlock(rpcBlock, dbBlock);
+            const diff:number = Math.abs(this.rpcHeight - unConfirmedBlocks[i]["height"]);
+            const isConfirmed = (diff >= this.TOTAL_CONFIRMATIONS) ? true : false;
+            if(blockCheckRes !== 'CLEAN') {
+                //Reject old transactions
+                const rejectTransactions = () => new Promise(async resolve => {
+                    for(let x = 0; x < dbBlock.getTransactions().length; x++) {
+                        await this.database.rejectTransaction(dbBlock.getTransactions()[x], undefined, false, false);
+                        if(x == dbBlock.getTransactions().length - 1) return resolve();
+                    }
+                });
+                await rejectTransactions();
+                await this.database.deleteBlock(unConfirmedBlocks[i]["height"]);
+                timeout(this.database.insertBlock(rpcBlock, isConfirmed).then(async ifOkay => {
+                    console.log("  >> Created Block [B]#" + unConfirmedBlocks[i]["height"]);
+                    //Block confirmation 3 blocks ago...
+                }).catch((e) => {
+                    Sentry.captureMessage(new Error(e));
+                    console.log("Error creating block [B]#" + unConfirmedBlocks[i]["height"]);
+                }), 10000).catch((err) => {
+                    if (err instanceof TimeoutError) {
+                      //Timed out, retry.
+                      console.error('Timed out on Block ID [B]:', unConfirmedBlocks[i]["height"]);
+                    }
+                });
+            }
             if(i == unConfirmedBlocks.length - 1) return true;
         }
     }
