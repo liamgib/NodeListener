@@ -39,7 +39,7 @@ export default class API {
                 fetch(`${AUCRYPTO_TRANSACTION}/webhook/invoiceUpdate`, {
                     method: 'post',
                     body: JSON.stringify({eventType: eventType, ...data}),
-                    headers: { 'Content-Type': 'application/json', 'X-INTER-AUCRYPTO-SERV': settings.SERVER_ID, 'X-INTER-AUCRYPTO-VERIF': digest }
+                    headers: { 'Content-Type': 'application/json', 'XINTERAUCRYPTOSERV': settings.SERVER_ID, 'XINTERAUCRYPTOVERIF': digest }
                 }).then((res:any) => res.json())
                 .then(async (json:any) => {
                     if(json.error !== undefined) {
@@ -77,6 +77,24 @@ export default class API {
                     return resolve(retry);
                 }
             }
+        });
+    }
+
+    public getRedirectionAddress(invoiceID:string):Promise<any> {
+        return new Promise<any>(async (resolve) => {
+            const hmac = crypto.createHmac('sha1', this.session);
+            const digest = 'sha1=' + hmac.update(JSON.stringify({invoiceID: invoiceID})).digest('hex');
+            fetch(`${AUCRYPTO_TRANSACTION}/webhook/getRedirectionAddress`, {
+                method: 'post',
+                body: JSON.stringify({invoiceID: invoiceID}),
+                headers: { 'Content-Type': 'application/json', 'XINTERAUCRYPTOSERV': settings.SERVER_ID, 'XINTERAUCRYPTOVERIF': digest }
+            }).then((res:any) => res.json())
+            .then(async (json:any) => {
+                return resolve(json);
+            }).catch(async (err:any) => {
+                console.log(err);
+                return resolve({});
+            });
         });
     }
 }

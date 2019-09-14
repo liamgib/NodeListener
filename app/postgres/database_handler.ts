@@ -38,6 +38,27 @@ export class database_handler {
     }
 
     /**
+     * Will delete the block height associated.
+     * @param blockHeight The block height to delete
+     */
+    public deleteBlock(blockHeight):Promise<boolean> {
+        return new Promise<boolean>(async (resolve, reject) => {
+            const client = await this.pool.connect();
+            try {
+                await client.query('BEGIN');
+                client.query('DELETE FROM blocks where height=$1',[blockHeight]);
+                await client.query('COMMIT');
+                return resolve(true);
+            } catch(e) {
+                await client.query('ROLLBACK');
+                return resolve(false);
+            } finally {
+                client.release();
+            }
+        });
+    }
+
+    /**
      * Create the block query, transaction data and update address values.
      * Submit socket update notifications to transaction instance if a relevant address is updated.
      * @param BlockInstance The block instance containing all relevant data.
@@ -322,7 +343,7 @@ export class database_handler {
     public verifyBlock(rpcBlock: Block, dbBlock: Block) {
         return new Promise((resolve, reject) => {
             let blockCheck = rpcBlock.compareBlock(dbBlock);
-            if(blockCheck !== 'CLEAN') return reject (blockCheck);
+            if(blockCheck !== 'CLEAN') return resolve (blockCheck);
             let rpcTransactions = rpcBlock.getTransactions();
             let checkedRpcTransactions = rpcBlock.getTransactions();
             let rejectedTransactions: Transaction[] = [];
@@ -432,7 +453,7 @@ export class database_handler {
                     }else{
                         //Either a new transaction or an orphaned transaction.
                     }
-                    return resolve();
+                    return resolve('CLEAN');
                 }
             });
         });
@@ -471,8 +492,14 @@ export class database_handler {
      * @param {Transaction} transaction The transaction to reject.
      */
     public rejectTransaction(transaction: Transaction, poolClient: PoolClient, isConfirmed: boolean, isMempool: boolean) {
+        let poolClientPassed = true;
+        if(!poolClient) poolClientPassed = false;
         return new Promise<object>(async (resolve, reject) => {
             try {
+                if(!poolClient) {
+                    poolClient = await this.pool.connect();
+                    await poolClient.query('BEGIN');
+                }
                 let classToDelete = isMempool ? 'mempooltransactions' : 'transactions';
                 await poolClient.query('INSERT INTO rejectedtransactions(transactionid, version, size, totalsent, totalrecieved, totalfee, senders, receivers, time, confirmed, height, isMempool) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)', [transaction.getTransactionID(), transaction.getVersion(), transaction.getSize(), transaction.getTotalSent(), transaction.getTotalRecieved(), transaction.calculateFee(), transaction.getSenders(), transaction.getReceivers(), transaction.getTime(), isConfirmed, transaction.getHeight(), isMempool]);
                 await poolClient.query(`DELETE from ${classToDelete} where transactionid = $1`, [transaction.getTransactionID()]);
@@ -484,9 +511,13 @@ export class database_handler {
                 }
                 const FEES = await transaction.calculateFee();
                 if(FEES !== 0) await this.subtractAddressQuery(poolClient, 'FEES', FEES, false);
+                if(!poolClientPassed) poolClient.query('COMMIT');
                 resolve([true, transaction]);
             } catch (e) {
+                await poolClient.query('ROLLBACK');
                 reject();
+            } finally {
+                if(!poolClientPassed) poolClient.release();
             }
         });
     }

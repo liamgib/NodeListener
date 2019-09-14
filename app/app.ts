@@ -45,7 +45,7 @@ function authenticationMiddleware(req:any, res:any, next:any) {
 
     const hmac = crypto.createHmac('sha1', secret);
     const digest = 'sha1=' + hmac.update(payload).digest('hex');
-    const checksum = req.get('X-INTER-AUCRYPTO-VERIF');
+    const checksum = req.get('XINTERAUCRYPTOVERIF');
     if(!checksum || !digest || checksum !== digest) {
         return next({error: 'Request body digest did not match verification.'});
     }
